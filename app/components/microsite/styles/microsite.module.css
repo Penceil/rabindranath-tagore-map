@@ -1,0 +1,41 @@
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  color: #444444;
+}
+
+.main {
+  flex: 1;
+}
+
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 36px 20px;
+}
+
+.title {
+  font-size: 34px;
+  line-height: 1.2;
+  margin: 0 0 12px;
+}
+
+.description {
+  font-size: 18px;
+  line-height: 1.6;
+  color: #666666;
+  max-width: 760px;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 28px;
+  }
+
+  .description {
+    font-size: 16px;
+  }
+}

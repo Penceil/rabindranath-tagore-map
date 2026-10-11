@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* The base styles the main site's globals.css gives every microsite page. */
+@layer base {
+  body {
+    background-color: #ffffff;
+    color: #444444;
+    font-family: var(--font-TTNormsPro), sans-serif;
+    overflow-x: hidden;
+  }
+
+  button {
+    cursor: pointer;
+  }
+}
+
+html,
+body,
+body * {
+  scroll-behavior: auto !important;
+}
+
+/* The site's thin brown scrollbar (Chrome, Edge and Safari). */
+*::-webkit-scrollbar {
+  width: 2px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #dedede;
+  border-radius: 2px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #7f665b;
+  border-radius: 2px;
+}

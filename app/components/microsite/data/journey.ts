@@ -1,0 +1,538 @@
+import { S2S_ASSETS } from "./home";
+
+/**
+ * Content for "The Journey": Tagore's 1927 voyage to Java and Bali, one stop per
+ * date, copied from the Figma file's "Key Moment + Anecdotes" frame.
+ *
+ * Positions are in the map's own units, the 3088 × 1756 viewBox of the SVG the
+ * designer exported ("The Journey.svg"). The places the designer marked keep the
+ * exact coordinates of her dots; the Bali villages, which she left as "a few
+ * series of dots", are placed from their latitude and longitude with the same
+ * projection her dots follow (x = 25.457 × lon − 1057.2, y = −25.617 × lat + 1072.8).
+ */
+
+export const JOURNEY_ASSETS = `${S2S_ASSETS}/journey`;
+
+export type JourneyPlaceId =
+    | "calcutta"
+    | "madras"
+    | "singapore"
+    | "malaya"
+    | "penang"
+    | "belawan"
+    | "medan"
+    | "batavia"
+    | "bandung"
+    | "borobudur"
+    | "jogjakarta"
+    | "prambanan"
+    | "surakarta"
+    | "surabaya"
+    | "buleleng"
+    | "denpasar"
+    | "bangli"
+    | "karangasem"
+    | "tampaksiring"
+    | "gianyar"
+    | "ubud"
+    | "mundu"
+    | "atSea"
+    | "siam";
+
+export type JourneyPlace = {
+    name: string;
+    x: number;
+    y: number;
+    /**
+     * How large its dot is drawn, as Statskog varies its own: the places the
+     * journey turns on are large, passing ones small (never so small they vanish).
+     */
+    size: "large" | "medium" | "small";
+    /** Hidden until the stop with this id has been reached: the Bali villages. */
+    revealedBy?: string;
+};
+
+export const journeyPlaces: Record<JourneyPlaceId, JourneyPlace> = {
+    calcutta: { name: "Calcutta", x: 1195.17, y: 495.51, size: "large" },
+    madras: { name: "Madras", x: 992.52, y: 741.8, size: "medium" },
+    singapore: { name: "Singapore", x: 1582.21, y: 1038.47, size: "large" },
+    // Not one of the designer's dots: Kuala Lumpur, so the Malayan stay has a place of its own.
+    malaya: { name: "Malaya", x: 1531.5, y: 992.4, size: "medium" },
+    penang: { name: "Penang", x: 1487.92, y: 907.91, size: "medium" },
+    belawan: { name: "Belawan", x: 1450.31, y: 976.65, size: "medium" },
+    medan: { name: "Medan", x: 1450.31, y: 988.39, size: "small" },
+    batavia: { name: "Batavia", x: 1652.77, y: 1227.73, size: "large" },
+    bandung: { name: "Bandung", x: 1684.04, y: 1250.68, size: "medium" },
+    borobudur: { name: "Borobudur", x: 1746.39, y: 1267.09, size: "small" },
+    jogjakarta: { name: "Jogjakarta", x: 1752.74, y: 1273.78, size: "large" },
+    prambanan: { name: "Prambanan", x: 1761, y: 1269.9, size: "small" },
+    surakarta: { name: "Surakarta", x: 1768.18, y: 1264.2, size: "large" },
+    surabaya: { name: "Surabaya", x: 1821.45, y: 1271.15, size: "medium" },
+    buleleng: { name: "Buleleng", x: 1874.11, y: 1280.73, size: "large" },
+    denpasar: { name: "Den Pasar", x: 1875.91, y: 1293.26, size: "medium" },
+    bangli: { name: "Bangli", x: 1879.39, y: 1289.37, size: "small", revealedBy: "bali-tour" },
+    karangasem: { name: "Karang Asem", x: 1885.88, y: 1289.26, size: "small", revealedBy: "bali-tour" },
+    tampaksiring: { name: "Tampak Siring", x: 1878.25, y: 1288.37, size: "small", revealedBy: "bali-tour" },
+    gianyar: { name: "Gianyar", x: 1878.76, y: 1291.57, size: "small", revealedBy: "bali-tour" },
+    ubud: { name: "Ubud", x: 1876.97, y: 1290.72, size: "small", revealedBy: "bali-tour" },
+    mundu: { name: "Mundu", x: 1872.14, y: 1284.4, size: "small", revealedBy: "bali-tour" },
+    atSea: { name: "At sea (ship Mijer)", x: 1594, y: 939.41, size: "small" },
+    siam: { name: "Siam", x: 1504.15, y: 727.18, size: "medium" },
+};
+
+export type JourneyRouteId = "madras-singapore" | "penang-belawan";
+
+/** The two sea crossings the designer starred, drawn exactly as in her SVG. */
+export const journeyRoutes: Record<JourneyRouteId, string> = {
+    "madras-singapore":
+        "M993.29,742.93c10.62,10.31,27.8,24.84,51.93,36.39,25.17,12.05,45.98,15.16,81.21,20.67,41.96,6.56,87.65,13.9,99.07,15.85,46,7.85,140.07,23.91,204.47,89.56,37.96,38.69,67.36,76.87,67.36,76.87,14.04,18.23,31.96,43.21,64.19,53.1,8.96,2.75,16.79,3.65,22.19,3.96",
+    "penang-belawan": "M1489.19,909.71c9.54,12.84-10.94,37.52-36.68,65.69",
+};
+
+/** A photograph beside a card, cropped as in Figma: the picture's box relative to its frame. */
+export type JourneyImage = {
+    src: string;
+    alt: string;
+    /** The frame is 180px tall and one of two widths. */
+    width: 166 | 198;
+    crop: { width: string; height: string; left: string; top: string };
+};
+
+export type JourneyStop = {
+    id: string;
+    date: string;
+    place: string;
+    summary: string;
+    /** The second card "read more" opens; stops without one show no button. */
+    more?: string;
+    /** The design's three card widths, by how much the card has to say. */
+    size: "large" | "medium" | "small";
+    image?: JourneyImage;
+    /** The dot the card belongs to and the camera settles on. */
+    marker: JourneyPlaceId;
+    /**
+     * Stops that share a value are anecdotes from one place (the coloured circles
+     * in the design). Their dots gather around that place, one per date.
+     */
+    cluster?: JourneyPlaceId;
+    /** Other places lit with this stop. */
+    also?: JourneyPlaceId[];
+    /** A starred crossing: the dashed line drawn as the map follows it. */
+    route?: JourneyRouteId;
+    /** An inland tour: its places appear one after another, without a line. */
+    series?: JourneyPlaceId[];
+    /** How far the map zooms in, against the overview of the first stop. */
+    zoom: number;
+};
+
+const image = (
+    file: string,
+    alt: string,
+    width: JourneyImage["width"],
+    crop: JourneyImage["crop"]
+): JourneyImage => ({ src: `${JOURNEY_ASSETS}/${file}`, alt, width, crop });
+
+export const journeyStops: JourneyStop[] = [
+    {
+        id: "departure",
+        date: "12 July",
+        place: "CALCUTTA | DEPARTURE",
+        summary:
+            "Sets out on a three-and-a-half-month Southeast Asian tour, framed as a cultural mission of Visva Bharati University, Santiniketan.",
+        more: "Travels with philologist Suniti Kumar Chatterji, artist-photographer-architect Surendranath Kar, and painter-musician Dhirendra Krishna Deva Varman. Twin aims: study surviving remains of Indian civilization in the region, and build cultural cooperation. At a Calcutta send-off he called it 'a pilgrimage to India beyond its modern political boundaries.'",
+        size: "large",
+        image: image("calcutta-portrait.jpg", "Portrait of Rabindranath Tagore", 166, {
+            width: "233.22%",
+            height: "100%",
+            left: "0.17%",
+            top: "-0.26%",
+        }),
+        marker: "calcutta",
+        zoom: 1,
+    },
+    {
+        id: "en-route",
+        date: "July (en route)",
+        place: "Madras > Singapore (at sea)",
+        summary: "Party sails from Madras to Singapore aboard the French ship Ambois.",
+        more: "Fund-raising for Visva Bharati was an open aim of the tour; at the Indian end, families like the Birla and Bajoria helped fund the trip.",
+        size: "large",
+        image: image("en-route.jpg", "Tagore seated among his travelling companions", 166, {
+            width: "100%",
+            height: "130.49%",
+            left: "0.12%",
+            top: "-10.34%",
+        }),
+        marker: "singapore",
+        also: ["madras"],
+        route: "madras-singapore",
+        zoom: 1.35,
+    },
+    {
+        id: "singapore-malaya",
+        date: "c. Late July - August",
+        place: "Singapore & Malaya",
+        summary: "Month-long stay in Singapore and Malaya before crossing to the Dutch East Indies.",
+        more: "Dutch musicologist Arnold Bake (who had studied at Santiniketan) acted as mediator and had warned Tagore the Dutch were nervous about recent communist uprisings. Tagore's promise to keep out of politics reassured the authorities. The invitation came privately from the Kunstkring (Art Circle), not the colonial government.",
+        size: "large",
+        image: image("singapore-malaya.jpg", "Tagore with a large gathering of hosts", 198, {
+            width: "249.84%",
+            height: "183.44%",
+            left: "-78.56%",
+            top: "-41.49%",
+        }),
+        marker: "malaya",
+        also: ["singapore"],
+        zoom: 1.8,
+    },
+    {
+        id: "penang-belawan",
+        date: "17 August",
+        place: "Penang > Belawan (Sumatra) > Medan",
+        summary:
+            "Crosses from Penang to Belawan; spends a few hours in Medan, then sails for Java on the boat Plancius the same day.",
+        size: "large",
+        marker: "belawan",
+        also: ["penang", "medan"],
+        route: "penang-belawan",
+        zoom: 2.6,
+    },
+    {
+        id: "batavia-arrival",
+        date: "21 August",
+        place: "Batavia (Java)",
+        summary: "Arrives in Batavia.",
+        more: "Welcomed by Mr and Mrs Bake, Dr F.D.K. Bosch and Dr Hoesein Djajadiningrat. The Kunstkring hosts a reception; a dinner given by British Consul Mr Crosby lets the party meet local intellectuals and Indian & Chinese businessmen.",
+        size: "small",
+        marker: "batavia",
+        cluster: "batavia",
+        zoom: 3.2,
+    },
+    {
+        id: "buleleng",
+        date: "26 August",
+        place: "Buleleng (Bali)",
+        summary:
+            "Arrives at Boeleleng (Buleleng), Bali, after a brief stopover in Surabaya; begins a roughly two-week Bali stay (26 August - 8 September).",
+        more: "Had been advised not to miss the rare spectacle of a cremation ceremony for a Hindu prince.",
+        size: "large",
+        image: image("buleleng.jpg", "A pavilion in Bali", 166, {
+            width: "124.15%",
+            height: "162%",
+            left: "-11.97%",
+            top: "-14.3%",
+        }),
+        marker: "buleleng",
+        zoom: 3.4,
+    },
+    {
+        id: "bali-tour",
+        date: "26 August – 8 September",
+        place: "Bali (Buleleng > Bangli > Karang Asem > Tampak Siring > Gianyar > Den Pasar > Ubud > Mundu > Buleleng)",
+        summary: "An intensive tour of Bali; no lectures were scheduled.",
+        more: "Overwhelmed by the scenery and Hindu ritual - likened arriving processions of offerings to 'some picture from the Ajanta caves' come to life. On a motor ride the Raja of Karang Asem (Hida Anake Agoeng Bagoes Djelantik) startled him with the Sanskrit word 'samudra' and other Sanskrit names for the sea, then reeled off Indian river names. To a philosophical question the raja replied: 'Dewa Dewa tida apa, Nirvana satu' (Gods and their worship are immaterial, Nirvana is the supreme goal). Yet Tagore was disturbed that Balinese culture seemed frozen in an archaic, repeating cycle.",
+        size: "large",
+        image: image("bali-tour.jpg", "A hall in Bali lit by chandeliers", 198, {
+            width: "163.89%",
+            height: "100%",
+            left: "-45.78%",
+            top: "0%",
+        }),
+        marker: "buleleng",
+        series: ["buleleng", "bangli", "karangasem", "tampaksiring", "gianyar", "denpasar", "ubud", "mundu"],
+        zoom: 5,
+    },
+    {
+        id: "surabaya-return",
+        date: "9 September",
+        place: "Surabaya (Java)",
+        summary: "Returns from Bali to Surabaya, beginning the Java leg (9 - 30 September).",
+        more: "Hosted by the former Mangkoenegoro VI of Surakarta, who had voluntarily resigned and was living in Surabaya to run his sugar-export business. Tagore was charmed by his hospitality.",
+        size: "large",
+        image: image("surabaya.jpg", "Tagore seated beside his host", 166, {
+            width: "141.01%",
+            height: "184%",
+            left: "-25.12%",
+            top: "-42%",
+        }),
+        marker: "surabaya",
+        cluster: "surabaya",
+        zoom: 3.6,
+    },
+    {
+        id: "surabaya-gathering",
+        date: "10 September",
+        place: "Surabaya",
+        summary:
+            "Meets about fifteen educated Javanese at a gathering arranged by Raden M. Harjo Soejono (son of the Mangkoenegoro).",
+        more: "These 'Swarajist' nationalists asked whether an East-West union was possible amid continued Western dominance and exploitation. Tagore answered that union was impossible along the path of competition for power and goods, but possible on the intellectual and spiritual plane. The discussion lasted two hours.",
+        size: "large",
+        marker: "surabaya",
+        cluster: "surabaya",
+        zoom: 3.6,
+    },
+    {
+        id: "surabaya-lectures",
+        date: "11 September",
+        place: "Surabaya",
+        summary:
+            "Chatterji lectures the Indonesische Studieclub on Santiniketan and Indian education; that same evening Tagore speaks on 'What is art?' at the local Kunstkring.",
+        size: "large",
+        marker: "surabaya",
+        cluster: "surabaya",
+        zoom: 3.6,
+    },
+    {
+        id: "surakarta-arrival",
+        date: "12 September",
+        place: "SURAKARTA",
+        summary:
+            "Arrives for a five-day stay (12 - 17 September) as guest of honour of Mangkoenegoro VII, a cultivated patron of Javanese culture.",
+        more: "Dr Radjiman joins to accompany them. That evening, Tagore's poem on Java - translated into Javanese by the Mangkoenegoro himself - is sung by local singers. Despite failing health, the poet endured the September heat where electric fans were unknown.",
+        size: "large",
+        image: image("surakarta-arrival.jpg", "Tagore with his hosts at Surakarta", 198, {
+            width: "123.14%",
+            height: "100%",
+            left: "-13.33%",
+            top: "0%",
+        }),
+        marker: "surakarta",
+        cluster: "surakarta",
+        zoom: 4.5,
+    },
+    {
+        id: "java-instituut",
+        date: "13 September",
+        place: "SURAKARTA",
+        summary: "Visit to the Java Instituut.",
+        more: "Meets the celebrated young Dutch scholar of medieval Javanese religion and literature, Dr Theodore Gautier Thomas Pigeaud.",
+        size: "small",
+        marker: "surakarta",
+        cluster: "surakarta",
+        zoom: 4.5,
+    },
+    {
+        id: "grand-reception",
+        date: "14 September",
+        place: "SURAKARTA",
+        summary: "Grand reception; Tagore lectures at the Kunstkring on India's attitude to conflict between nations.",
+        more: "Meets Dutch engineer J.J. Moens and noted architect T. Karsten. A folder with his Java poem in English and Dutch translation, autographed by poet and Mangkoenegoro, is distributed.",
+        size: "large",
+        marker: "surakarta",
+        cluster: "surakarta",
+        zoom: 4.5,
+    },
+    {
+        id: "wajang-poerwa",
+        date: "16 September",
+        place: "SURAKARTA",
+        summary:
+            "Meets Dutch authority W.F. Stutterheim; visits the Van Deventer School for Javanese girls; watches a Wajang Poerwa (shadow-theatre) performance at Prince Koesoemajoedo's house.",
+        more: "Reflected that Javanese dance and shadow-play are 'the language of their history and their annals.' Watching the shadows he wrote of 'the dance of Mahamaya on the body of the prostrate Shiva.' Stutterheim favoured teaching Sanskrit and Kawi; the idea of Indian help interpreting Balinese inscriptions was raised.",
+        size: "large",
+        marker: "surakarta",
+        cluster: "surakarta",
+        zoom: 4.5,
+    },
+    {
+        id: "contact-club",
+        date: "c. 17 September",
+        place: "SURAKARTA",
+        summary: "Reception with Javanese poets at the Contact Club before departure.",
+        more: "Poems from his Katha o Kahini (Stories and Fables) were recited in Dutch and Javanese; a Javanese poet's reply to his Java poem was read out and sung. The Surakarta experience was a high point of the Java visit.",
+        size: "medium",
+        marker: "surakarta",
+        cluster: "surakarta",
+        zoom: 4.5,
+    },
+    {
+        id: "tagorestraat",
+        date: "18 September",
+        place: "Surakarta > Jogjakarta",
+        summary:
+            "His three companions (Deva Varman, Kar, Chatterji) leave by car with Samuel Koperberg; Tagore's own departure is delayed so he can open a road named after him, Tagorestraat.",
+        size: "large",
+        image: image("tagorestraat.jpg", "Tagore standing with a companion beside a palm", 166, {
+            width: "121.72%",
+            height: "158.82%",
+            left: "-18.67%",
+            top: "-29.69%",
+        }),
+        marker: "surakarta",
+        cluster: "surakarta",
+        also: ["jogjakarta"],
+        zoom: 4.5,
+    },
+    {
+        id: "pakoe-alam",
+        date: "18 September",
+        place: "Jogjakarta",
+        summary: "Arrives around 11:30 a.m.; hosted by the Pakoe Alam.",
+        more: "A Serimpi dance (a group dance for four girls) is performed - Tagore thought it the best dance he had seen so far in Java. Dinner served at the unusual hour of 11 p.m. He learned young Indonesian Muslims were now going to India, besides Mecca, to study Islam.",
+        size: "medium",
+        marker: "jogjakarta",
+        cluster: "jogjakarta",
+        zoom: 4.5,
+    },
+    {
+        id: "prambanan",
+        date: "19 September",
+        place: "Prambanan & sites near Jogjakarta",
+        summary:
+            "Chatterji and Deva Varman visit Tjandi Loembeng, Sewoe, Plaosan and Kalasan with Bosch and Van Stein Callenfels, plus a further trip to Prambanan.",
+        more: "Meet Mr Van Haan, engineer in charge of the Prambanan restoration. The party was delighted that Prambanan's Ramayana reliefs had no Indian temple parallel, and intrigued that the Javanese reliefs diverged from the Bhagavata text and showed Puranic tales unknown in India. They witnessed the 'miracle' of cross-cultural temple reconstruction, credited to the Netherlands East Indies government.",
+        size: "large",
+        marker: "prambanan",
+        zoom: 4.5,
+    },
+    {
+        id: "darmo-sedjati",
+        date: "(During Jogjakarta Stay)",
+        place: "Jogjakarta",
+        summary: "Visits four 'Darmo Sedjati' nation-building institutions.",
+        more: "Krido Bekso Wiromo (Javanese dance and music), Wanito Oetomo (a women's education society), Taman Siswa (nationalist coeducational school under Raden Mas Soewardi Soerjaningrat), and Habirando (a training school for dalang). The Indians were impressed by their efficiency.",
+        size: "medium",
+        image: image("jogjakarta-institutions.jpg", "A group seated before a pavilion", 166, {
+            width: "140%",
+            height: "106.38%",
+            left: "-25.69%",
+            top: "-3.19%",
+        }),
+        marker: "jogjakarta",
+        cluster: "jogjakarta",
+        zoom: 4.5,
+    },
+    {
+        id: "ramayana",
+        date: "c. 20 September",
+        place: "JOGJAKARTA",
+        summary: "Watches a Ramayana dance drama (up to the slaying of Jatayu) at the patih's invitation.",
+        // As in the design, where this card repeats 12 September's text.
+        more: "Dr Radjiman joins to accompany them. That evening, Tagore's poem on Java - translated into Javanese by the Mangkoenegoro himself - is sung by local singers. Despite failing health, the poet endured the September heat where electric fans were unknown.",
+        size: "large",
+        image: image("c20-september.jpg", "Batik cloths hung on display", 198, {
+            width: "127.86%",
+            height: "199%",
+            left: "-0.06%",
+            top: "-49.63%",
+        }),
+        marker: "jogjakarta",
+        cluster: "jogjakarta",
+        zoom: 4.5,
+    },
+    {
+        id: "borobudur",
+        date: "(During Jogjakarta Stay)",
+        place: "BOROBUDUR",
+        summary: "Visits Borobudur; unimpressed by the overall structure but admires the individual sculptures.",
+        more: "Called it 'a mountain with a diminutive stone cap,' but specially liked the Jataka reliefs of everyday life 'nowhere tainted with obscenity or vulgarity.' Finished a long poem on Borobudur while seated at the monument's foot - the second of his three memorable Indonesia poems. He gratefully credited the Dutch experts, saying 'we must accept them as our Gurus if we would understand India in its completeness.'",
+        size: "large",
+        image: image("borobudur.jpg", "Visitors walking before Borobudur", 198, {
+            width: "138.78%",
+            height: "216%",
+            left: "-19.39%",
+            top: "-58%",
+        }),
+        marker: "borobudur",
+        zoom: 4.5,
+    },
+    {
+        id: "islamic-modernism",
+        date: "24 September",
+        place: "Jogjakarta",
+        summary: "Last day in Jogjakarta; an encounter with Islamic modernism.",
+        more: "Marathi-speaking Mirza Ali Baig, a link between Javanese and Indian Muslims, invites Chatterji to the Muhammadiya. Chatterji notes 32 Dutch-Javanese and 60 primary schools under Muhammadiya sponsorship, and visits a Muslim girls' school founded by a Mrs Dachlan.",
+        size: "medium",
+        marker: "jogjakarta",
+        cluster: "jogjakarta",
+        zoom: 4.5,
+    },
+    {
+        id: "bandung-arrival",
+        date: "24 September (evening)",
+        place: "Bandung",
+        summary: "Arrives at the cool mountain resort of Bandung with Pigeaud and Koperberg on the return trip.",
+        more: "A much-longed-for respite from the hot Javanese and Balinese summer.",
+        size: "large",
+        marker: "bandung",
+        cluster: "bandung",
+        zoom: 3.6,
+    },
+    {
+        id: "bandung-kunstkring",
+        date: "25 September",
+        place: "BANDUNG",
+        summary: "Gives a talk on art at the local Kunstkring.",
+        size: "medium",
+        marker: "bandung",
+        cluster: "bandung",
+        zoom: 3.6,
+    },
+    {
+        id: "soekarno",
+        date: "26 September",
+        place: "Lembang / Bandung",
+        summary:
+            "Visits the theosophical teacher-training centre Goenoeng Sari (a pan-religious prayer meeting); has an unscheduled meeting with young nationalist leader Soekarno; leaves by train for Batavia the same day.",
+        more: "With no Dutch officials present, Koperberg introduced Soekarno and two young Sundanese activists. They spoke good English and knew a great deal about Gandhi, Chittaranjan Das, Motilal Nehru and Sarojini Naidu. The poet and companions were much impressed by the charming young leader.",
+        size: "large",
+        marker: "bandung",
+        cluster: "bandung",
+        zoom: 3.6,
+    },
+    {
+        id: "batavia-farewell",
+        date: "27 – 29 September",
+        place: "BATAVIA",
+        summary: "Reads his poems in Bengali and English translation at a last Kunstkring meeting.",
+        more: "Meets archaeologist Mr Maclain Pont (in charge of the Majapahit excavations). Chatterji meets the famous Javanese scholar Poerbatjaraka, a researcher on Agastya.",
+        size: "medium",
+        image: image("batavia-kunstkring.jpg", "Tagore at a gathering in Batavia", 166, {
+            width: "135.65%",
+            height: "177%",
+            left: "-20.38%",
+            top: "-38.5%",
+        }),
+        marker: "batavia",
+        cluster: "batavia",
+        zoom: 3.2,
+    },
+    {
+        id: "batavia-singapore",
+        date: "30 September (morning)",
+        place: "Batavia > Singapore",
+        summary: "Leaves Batavia for Singapore en route to Bangkok, accompanied by Surendranath Kar.",
+        more: "Chatterji stays behind for a lecture assignment at the Koninklijk Bataviaasch Genootschap van Kunsten en Wetenschappen.",
+        size: "large",
+        // The design repeats the Borobudur photograph here.
+        image: image("borobudur.jpg", "Visitors walking before Borobudur", 198, {
+            width: "138.78%",
+            height: "216%",
+            left: "-19.39%",
+            top: "-58%",
+        }),
+        marker: "batavia",
+        also: ["singapore"],
+        zoom: 1.9,
+    },
+    {
+        id: "sagarika",
+        date: "1 October",
+        place: "At sea (ship Mijer)",
+        summary: "Composes his famous Bali poem 'Sagarika,' paying tribute to the island and the Indonesian people.",
+        size: "large",
+        marker: "atSea",
+        zoom: 1.9,
+    },
+    {
+        id: "siam",
+        date: "(On The Way Back to India)",
+        place: "Siam (modern Thailand)",
+        summary:
+            "Pays a brief visit to Siam before returning to India, completing the roughly three-and-a-half-month tour.",
+        more: "The article's narrative closes with the return leg and does not record the exact date the poet reached Santiniketan. Its verdict on the visit: India and Indonesia briefly 'recognized an ancient bond and the possibility of a new partnership' - but the planned cultural-exchange programme never materialized on any significant scale.",
+        size: "large",
+        marker: "siam",
+        zoom: 1.4,
+    },
+];
