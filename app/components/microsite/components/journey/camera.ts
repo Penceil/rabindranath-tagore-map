@@ -87,19 +87,19 @@ export const flightDuration = (from: View, to: View, viewport: Size) => {
 export const clusterSpread = (k: number, base: number) => clamp((k / base - 2.2) / 1, 0, 1);
 
 /**
- * Offsets (screen px, before spreading) for the dots of one place, in date order:
- * a small ring starting at the top and running clockwise.
+ * The small ring the dots of one place sit on, in date order: its radius (screen
+ * px, before spreading) and each dot's angle, starting at the top and running
+ * clockwise. The ring is turned as a whole so the current date faces its card.
  */
-export const clusterOffsets = (count: number): Point[] => {
-    if (count < 2) {
-        return [{ x: 0, y: 0 }];
-    }
-    const radius = count <= 2 ? 8 : count <= 4 ? 11 : 14;
+export const clusterRing = (count: number) => ({
+    radius: count <= 2 ? 8 : count <= 4 ? 11 : 14,
+    angles: Array.from({ length: count }, (_, index) => -Math.PI / 2 + (index / count) * Math.PI * 2),
+});
 
-    return Array.from({ length: count }, (_, index) => {
-        const angle = -Math.PI / 2 + (index / count) * Math.PI * 2;
-        return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
-    });
+/** The shortest turn from one angle to another, so a ring never spins the long way round. */
+export const nearestTurn = (from: number, to: number) => {
+    const delta = (((to - from) % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+    return from + delta;
 };
 
 /** Scales and moves a route's path data (an absolute M, then relative curves) onto the screen. */

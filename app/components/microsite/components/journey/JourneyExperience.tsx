@@ -6,6 +6,7 @@ import {
     AnimatePresence,
     animate,
     motion,
+    motionValue,
     useMotionValue,
     useReducedMotion,
     type AnimationPlaybackControls,
@@ -21,10 +22,11 @@ import {
     MAP_DETAIL,
     MAP_IMAGE,
     baseScale,
-    clusterOffsets,
+    clusterRing,
     clusterSpread,
     flightDuration,
     interpolateView,
+    nearestTurn,
     toTransform,
     type Point,
     type Size,
@@ -37,7 +39,6 @@ import {
     journeyStops,
     type JourneyPlaceId,
     type JourneyRouteId,
-    type JourneyStop,
 } from "../../data/journey";
 
 /** From a dot's centre to its card's top-left corner, as in the design (dot at 712.5, card at 736 × 332). */
@@ -57,15 +58,13 @@ type MapDotData = {
     place: JourneyPlaceId;
     x: number;
     y: number;
-    /** Screen offset within its place's cluster, before spreading. */
-    offset: Point;
+    /** For one anecdote of many: the radius (px, before spreading) of its place's ring, and its angle on it. */
+    ring?: { radius: number; angle: number };
     /** The stop this dot opens. */
     stop: number;
     label: string;
     /** Diameter in px: the place's own size, or, for one anecdote of many, its size gathered up. */
     size: number;
-    /** One of several anecdote dots around a place; these shrink a little as they fan out. */
-    anecdote: boolean;
     /** Index of the stop that first shows this dot, for the Bali villages. */
     revealedAt?: number;
 };
@@ -80,6 +79,8 @@ const clusterMembers = placeIds.reduce<Partial<Record<JourneyPlaceId, number[]>>
     return members.length ? { ...groups, [id]: members } : groups;
 }, {});
 
+const clusterPlaces = Object.keys(clusterMembers) as JourneyPlaceId[];
+
 /** The first stop a place belongs to, so a single dot can open it. */
 const firstStopAt = (place: JourneyPlaceId) =>
     journeyStops.findIndex(
@@ -91,17 +92,16 @@ const mapDots = placeIds.flatMap<MapDotData>((id) => {
     const members = clusterMembers[id];
 
     if (members) {
-        const offsets = clusterOffsets(members.length);
+        const ring = clusterRing(members.length);
         return members.map((stop, index) => ({
             key: `${id}-${stop}`,
             place: id,
             x: place.x,
             y: place.y,
-            offset: offsets[index],
+            ring: { radius: ring.radius, angle: ring.angles[index] },
             stop,
             label: `${place.name}, ${journeyStops[stop].date}`,
             size: DOT_SIZE[place.size],
-            anecdote: true,
         }));
     }
 
@@ -111,91 +111,66 @@ const mapDots = placeIds.flatMap<MapDotData>((id) => {
             place: id,
             x: place.x,
             y: place.y,
-            offset: { x: 0, y: 0 },
             stop: firstStopAt(id),
             label: place.name,
             size: DOT_SIZE[place.size],
-            anecdote: false,
             revealedAt: place.revealedBy ? journeyStops.findIndex((stop) => stop.id === place.revealedBy) : undefined,
         },
     ];
 });
 
+const dotByKey = new Map(mapDots.map((dot) => [dot.key, dot]));
+
 /**
- * The dot a stop's ring goes round: its own anecdote dot in a cluster, else its
- * place. A stop that leaves from a clustered place without being one of its
- * anecdotes (Batavia > Singapore) rings the middle of the cluster.
+ * The dot that stands for a place at a given stop. A place with several anecdotes
+ * has one dot per date: the stop's own if it is one of them, else the date it leads
+ * to, or failing that the last one before it (Batavia > Singapore rings 27 – 29
+ * September).
  */
-const markerDot = (index: number): Pick<MapDotData, "x" | "y" | "offset"> => {
+const dotKeyFor = (place: JourneyPlaceId, index: number) => {
+    const members = clusterMembers[place];
+    if (!members) {
+        return place;
+    }
+    if (members.includes(index)) {
+        return `${place}-${index}`;
+    }
+    const next = members.find((member) => member > index) ?? [...members].reverse().find((member) => member < index);
+    return `${place}-${next}`;
+};
+
+/** The dots a stop rings with the dashed circle: its own, and the other places it names. */
+const ringedKeys = (index: number) => {
     const stop = journeyStops[index];
-    const key = stop.cluster ? `${stop.cluster}-${index}` : stop.marker;
-    const place = journeyPlaces[stop.marker];
-    return mapDots.find((dot) => dot.key === key) ?? { x: place.x, y: place.y, offset: { x: 0, y: 0 } };
+    return [stop.marker, ...(stop.also ?? [])].map((place) => dotKeyFor(place, index));
 };
 
 /**
- * The point the camera brings to its anchor and the card hangs from. For an
- * inland tour that is the north-east corner of its places, so the whole series
- * stays clear of the card to its left.
+ * Where the stop's own dot settles, in map units: on its place, or for one
+ * anecdote of many, east of it by the ring's radius, since the ring turns so the
+ * current date faces the card.
  */
-const focusOf = (stop: JourneyStop): Point => {
-    if (stop.series) {
-        const places = stop.series.map((id) => journeyPlaces[id]);
-        return { x: Math.max(...places.map((place) => place.x)), y: Math.min(...places.map((place) => place.y)) };
-    }
+const focusOf = (index: number, viewport: Size): Point => {
+    const stop = journeyStops[index];
     const place = journeyPlaces[stop.marker];
-    return { x: place.x, y: place.y };
+    const ring = dotByKey.get(dotKeyFor(stop.marker, index))?.ring;
+    if (!ring) {
+        return { x: place.x, y: place.y };
+    }
+    const k = toTransform({ focus: place, zoom: stop.zoom }, viewport, { x: 0, y: 0 }).k;
+    return { x: place.x + (ring.radius * clusterSpread(k, baseScale(viewport))) / k, y: place.y };
 };
 
 const routeStopIndex = (route: JourneyRouteId) => journeyStops.findIndex((stop) => stop.route === route);
 
-/**
- * Roughly how tall a card will be, from how many lines its text runs to, before
- * it is on screen to measure. Only used to tell which dots it would cover.
- */
-const estimateCardHeight = (stop: JourneyStop) => {
-    const textWidth = CARD_WIDTH[stop.size] - 90;
-    const placeLines = Math.ceil((stop.place.length * 11) / textWidth);
-    const summaryLines = Math.ceil((stop.summary.length * 7.6) / textWidth);
-    return 60 + 36 + 5 + placeLines * 18 + 5 + summaryLines * 26 + (stop.more ? 30 : 0);
-};
-
-/**
- * How much further right than the design's 23.5px a card starts, so that it
- * clears the dots just east of its own: the rest of a place's cluster, or a
- * neighbour as close as Jogjakarta is to Borobudur. Measured at the zoom the stop
- * settles at.
- */
-const cardRoomFor = (index: number, viewport: Size) => {
-    const stop = journeyStops[index];
-    const focus = focusOf(stop);
-    const k = toTransform({ focus, zoom: stop.zoom }, viewport, { x: 0, y: 0 }).k;
-    const spreadAmount = clusterSpread(k, baseScale(viewport));
-    const bottom = CARD_OFFSET.y + estimateCardHeight(stop);
-
-    return mapDots.reduce((room, dot) => {
-        if (dot.revealedAt !== undefined && dot.revealedAt > index) {
-            return room;
-        }
-        const dx = (dot.x - focus.x) * k + dot.offset.x * spreadAmount;
-        const dy = (dot.y - focus.y) * k + dot.offset.y * spreadAmount;
-        const beside = dx > -6 && dx < 100 && dy > CARD_OFFSET.y - 8 && dy < bottom + 8;
-        return beside ? Math.max(room, dx + 10 - CARD_OFFSET.x) : room;
-    }, 0);
-};
-
-/** Where on screen the focus of a stop should sit so its card, photograph included, fits beside it. */
+/** Where on screen the stop's dot should sit so its card, photograph included, fits beside it. */
 const anchorFor = (index: number, viewport: Size, desktop: boolean): Point => {
     if (!desktop) {
         // Between the strip of dates and the card sheet over the lower half.
         return { x: viewport.width / 2, y: Math.max(200, (172 + viewport.height * 0.54) / 2) };
     }
     const stop = journeyStops[index];
-    const reach =
-        CARD_OFFSET.x +
-        cardRoomFor(index, viewport) +
-        CARD_WIDTH[stop.size] +
-        (stop.image ? stop.image.width - IMAGE_OVERLAP.x : 0);
+    const reach = CARD_OFFSET.x + CARD_WIDTH[stop.size] + (stop.image ? stop.image.width - IMAGE_OVERLAP.x : 0);
 
     return {
         x: Math.min(viewport.width * 0.4948, viewport.width - 24 - reach),
@@ -211,29 +186,28 @@ const lerpPoint = (from: Point, to: Point, t: number): Point => ({
 type MapDotProps = {
     dot: MapDotData;
     camera: CameraValues;
-    lit: boolean;
+    /** How far its place's ring has been turned (radians); a still value for a single dot. */
+    turn: MotionValue<number>;
+    ringed: boolean;
     revealed: boolean;
     onSelect: (index: number) => void;
 };
 
-/** The soft light round a dot, stronger the larger it is; a lit dot takes a ring instead. */
-const dotGlow = (size: number, lit: boolean) => {
-    if (lit) {
-        return "scale-[1.3] shadow-[0_0_0_4px_rgba(255,255,255,0.28)]";
-    }
-    if (size >= DOT_SIZE.large) {
-        return "shadow-[0_0_10px_2px_rgba(255,255,255,0.45)]";
-    }
-    return size >= DOT_SIZE.medium ? "shadow-[0_0_6px_1px_rgba(255,255,255,0.35)]" : "opacity-90";
-};
-
-/** One place, or one anecdote of a place: a white dot that opens its stop, named on hover. */
-const MapDot = memo(({ dot, camera, lit, revealed, onSelect }: MapDotProps) => {
-    const x = useDerived([camera.x, camera.k, camera.spread], ([cx, k, s]) => dot.x * k + cx + dot.offset.x * s);
-    const y = useDerived([camera.y, camera.k, camera.spread], ([cy, k, s]) => dot.y * k + cy + dot.offset.y * s);
+/**
+ * One place, or one anecdote of a place: a white dot with a soft glow that opens
+ * its stop and is named on hover. The dots of the current stop carry the design's
+ * dashed gold ring.
+ */
+const MapDot = memo(({ dot, camera, turn, ringed, revealed, onSelect }: MapDotProps) => {
+    const x = useDerived([camera.x, camera.k, camera.spread, turn], ([cx, k, s, t]) =>
+        dot.x * k + cx + (dot.ring ? Math.cos(dot.ring.angle + t) * dot.ring.radius * s : 0)
+    );
+    const y = useDerived([camera.y, camera.k, camera.spread, turn], ([cy, k, s, t]) =>
+        dot.y * k + cy + (dot.ring ? Math.sin(dot.ring.angle + t) * dot.ring.radius * s : 0)
+    );
     // Anecdote dots sit on top of one another at their place's size in the overview,
     // and settle a little smaller as they fan out into a ring.
-    const scale = useDerived([camera.spread], ([s]) => (dot.anecdote ? 1 + (ANECDOTE_SIZE / dot.size - 1) * s : 1));
+    const scale = useDerived([camera.spread], ([s]) => (dot.ring ? 1 + (ANECDOTE_SIZE / dot.size - 1) * s : 1));
     const hit = Math.max(18, dot.size + 8);
 
     return (
@@ -252,13 +226,29 @@ const MapDot = memo(({ dot, camera, lit, revealed, onSelect }: MapDotProps) => {
             }`}
         >
             <motion.span className="block" style={{ scale, width: dot.size, height: dot.size }}>
-                <span
-                    className={`block h-full w-full rounded-full bg-white transition-[transform,box-shadow,opacity] duration-300 group-hover:scale-125 ${dotGlow(
-                        dot.size,
-                        lit
-                    )}`}
-                />
+                <span className="block h-full w-full rounded-full bg-white shadow-[0_0_10px_2px_rgba(255,255,255,0.45)] transition-transform duration-300 group-hover:scale-125" />
             </motion.span>
+            <AnimatePresence>
+                {ringed && (
+                    <motion.span
+                        aria-hidden
+                        className="pointer-events-none absolute left-1/2 top-1/2 -ml-[13.5px] -mt-[13.5px] h-[27px] w-[27px]"
+                        initial={{ opacity: 0, scale: 0.3 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.2 } }}
+                        transition={{ type: "spring", stiffness: 260, damping: 18 }}
+                    >
+                        <Image
+                            src={`${JOURNEY_ASSETS}/marker-ring.png`}
+                            alt=""
+                            width={27}
+                            height={27}
+                            unoptimized
+                            className="absolute inset-0 motion-safe:animate-spin-slow"
+                        />
+                    </motion.span>
+                )}
+            </AnimatePresence>
             <span className="pointer-events-none absolute bottom-full mb-[6px] whitespace-nowrap bg-white/95 px-2 py-[2px] text-[11px] uppercase leading-[18px] tracking-[1.32px] text-s2s-ink opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
                 {dot.label}
             </span>
@@ -309,7 +299,7 @@ const JourneyExperience = () => {
         [cameraX, cameraY, cameraK, spread]
     );
 
-    const viewRef = useRef<View>({ focus: focusOf(stops[0]), zoom: stops[0].zoom });
+    const viewRef = useRef<View>({ focus: journeyPlaces[stops[0].marker], zoom: stops[0].zoom });
     const anchorRef = useRef<Point>({ x: 0, y: 0 });
     const viewportRef = useRef<Size>({ width: 1, height: 1 });
     const timers = useRef<Timers>({ cancelled: false, controls: [] });
@@ -322,28 +312,24 @@ const JourneyExperience = () => {
         [madrasSingapore, penangBelawan]
     );
 
-    // Where the open card hangs: its place (map units) and the extra room it leaves (px) to clear nearby dots.
+    // How far each many-anecdote place's ring of dots is turned, so the current date faces its card.
+    const turns = useMemo(
+        () => Object.fromEntries(clusterPlaces.map((place) => [place, motionValue(0)])) as Partial<Record<JourneyPlaceId, MotionValue<number>>>,
+        []
+    );
+    const still = useMotionValue(0);
+
+    // The open card hangs the same distance from its dot on every stop, as in the
+    // design: 23.5px right of the dot's centre, its top 13.5px above it. The dot is
+    // its place (map units), pushed out east by the ring's radius for an anecdote.
     const cardPlaceX = useMotionValue(0);
     const cardPlaceY = useMotionValue(0);
-    const cardRoom = useMotionValue(0);
-    const ringX = useMotionValue(0);
-    const ringY = useMotionValue(0);
-    const ringOffsetX = useMotionValue(0);
-    const ringOffsetY = useMotionValue(0);
-
+    const cardRadius = useMotionValue(0);
     const cardX = useDerived(
-        [cameraX, cameraK, cardPlaceX, cardRoom],
-        ([cx, k, px, room]) => px * k + cx + CARD_OFFSET.x + room
+        [cameraX, cameraK, spread, cardPlaceX, cardRadius],
+        ([cx, k, s, px, radius]) => px * k + cx + radius * s + CARD_OFFSET.x
     );
     const cardY = useDerived([cameraY, cameraK, cardPlaceY], ([cy, k, py]) => py * k + cy + CARD_OFFSET.y);
-    const markerX = useDerived(
-        [cameraX, cameraK, spread, ringX, ringOffsetX],
-        ([cx, k, s, px, ox]) => px * k + cx + ox * s
-    );
-    const markerY = useDerived(
-        [cameraY, cameraK, spread, ringY, ringOffsetY],
-        ([cy, k, s, py, oy]) => py * k + cy + oy * s
-    );
 
     const applyView = useCallback(
         (view: View) => {
@@ -483,7 +469,7 @@ const JourneyExperience = () => {
         setMoving(!instant);
         setMoreOpen(false);
         const forward = from !== null && from < active;
-        const target: View = { focus: focusOf(stop), zoom: stop.zoom };
+        const target: View = { focus: focusOf(active, viewportRef.current), zoom: stop.zoom };
         const targetAnchor = anchorFor(active, viewportRef.current, viewportRef.current.width >= DESKTOP_MIN);
 
         // Crossings already sailed stay drawn; those ahead are taken back off the map.
@@ -495,6 +481,18 @@ const JourneyExperience = () => {
                 run.controls.push(animate(progress[id], 0, { duration: instant ? 0 : 0.4 }));
             }
         });
+
+        // A place with several anecdotes turns its ring so this date's dot faces the card.
+        const ownDot = dotByKey.get(dotKeyFor(stop.marker, active));
+        const turn = ownDot?.ring && turns[ownDot.place];
+        if (ownDot?.ring && turn) {
+            const to = nearestTurn(turn.get(), -ownDot.ring.angle);
+            if (instant) {
+                turn.set(to);
+            } else {
+                run.controls.push(animate(turn, to, { duration: 0.6, ease: EASE_FLIGHT }));
+            }
+        }
 
         // An inland tour plays its places in one by one only when arrived at going forward.
         setSeriesShown(stop.series && (instant || !forward) ? stop.series.length : 0);
@@ -540,15 +538,10 @@ const JourneyExperience = () => {
             if (run.cancelled) {
                 return;
             }
-            const dot = markerDot(active);
-            const focus = focusOf(stop);
-            cardPlaceX.set(focus.x);
-            cardPlaceY.set(focus.y);
-            cardRoom.set(cardRoomFor(active, viewportRef.current));
-            ringX.set(dot.x);
-            ringY.set(dot.y);
-            ringOffsetX.set(dot.offset.x);
-            ringOffsetY.set(dot.offset.y);
+            const place = journeyPlaces[stop.marker];
+            cardPlaceX.set(place.x);
+            cardPlaceY.set(place.y);
+            cardRadius.set(ownDot?.ring?.radius ?? 0);
             setArrived(active);
             setMoving(false);
             // Keep the address pointing at the date on screen, so it can be shared.
@@ -645,29 +638,12 @@ const JourneyExperience = () => {
 
     const stop = stops[active];
     const showCard = arrived === active;
-    const lit = useMemo(() => {
-        const keys = new Set<string>();
-        const light = (place: JourneyPlaceId) => {
-            const members = clusterMembers[place];
-            if (!members) {
-                keys.add(place);
-                return;
-            }
-            // A place with several anecdotes lights only the one this stop leads to,
-            // or failing that the last one before it, not every date it has.
-            const next = members.find((member) => member > active) ?? [...members].reverse().find((member) => member < active);
-            if (next !== undefined) {
-                keys.add(`${place}-${next}`);
-            }
-        };
-        stop.also?.forEach(light);
-        stop.series?.slice(0, seriesShown).forEach(light);
-        return keys;
-    }, [stop, active, seriesShown]);
+    // Every place the current stop names wears the dashed ring, once its card is open.
+    const ringed = useMemo(() => new Set(ringedKeys(active)), [active]);
 
     const tourIndex = stops.findIndex((candidate) => candidate.series);
     const isRevealed = (dot: MapDotData) => {
-        if (dot.revealedAt === undefined) {
+        if (dot.revealedAt === undefined || ringed.has(dot.key)) {
             return true;
         }
         if (active > dot.revealedAt) {
@@ -681,7 +657,7 @@ const JourneyExperience = () => {
     const moreWidth = viewport
         ? Math.max(
               CARD_WIDTH[stop.size],
-              Math.min(MORE_WIDTH, viewport.width - 24 - (anchorRef.current.x + CARD_OFFSET.x + cardRoom.get()))
+              Math.min(MORE_WIDTH, viewport.width - 24 - (cardX.get()))
           )
         : MORE_WIDTH;
 
@@ -763,49 +739,13 @@ const JourneyExperience = () => {
                                     key={dot.key}
                                     dot={dot}
                                     camera={camera}
-                                    lit={lit.has(dot.key)}
+                                    turn={turns[dot.place] ?? still}
+                                    ringed={showCard && ringed.has(dot.key)}
                                     revealed={isRevealed(dot)}
                                     onSelect={goTo}
                                 />
                             ))}
                         </div>
-
-                        {/* The current stop: a turning dashed ring round a white dot. */}
-                        <motion.div
-                            aria-hidden
-                            className="pointer-events-none absolute left-0 top-0 -ml-[13.5px] -mt-[13.5px] h-[27px] w-[27px]"
-                            style={{ x: markerX, y: markerY }}
-                        >
-                            <AnimatePresence>
-                                {showCard && (
-                                    <motion.div
-                                        key={stop.id}
-                                        className="absolute inset-0"
-                                        initial={{ opacity: 0, scale: 0.3 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.2 } }}
-                                        transition={{ type: "spring", stiffness: 260, damping: 18 }}
-                                    >
-                                        <Image
-                                            src={`${JOURNEY_ASSETS}/marker-ring.png`}
-                                            alt=""
-                                            width={27}
-                                            height={27}
-                                            unoptimized
-                                            className="absolute inset-0 motion-safe:animate-spin-slow"
-                                        />
-                                        <Image
-                                            src={`${JOURNEY_ASSETS}/marker-dot.png`}
-                                            alt=""
-                                            width={9}
-                                            height={9}
-                                            unoptimized
-                                            className="absolute left-[9px] top-[9px]"
-                                        />
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </motion.div>
                     </>
                 )}
 

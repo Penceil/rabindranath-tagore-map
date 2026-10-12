@@ -187,8 +187,9 @@ export const journeyStops: JourneyStop[] = [
         summary:
             "Crosses from Penang to Belawan; spends a few hours in Medan, then sails for Java on the boat Plancius the same day.",
         size: "large",
-        marker: "belawan",
-        also: ["penang", "medan"],
+        // The crossing ends at Belawan; Medan, a few hours inland, is the day's last stop.
+        marker: "medan",
+        also: ["penang", "belawan"],
         route: "penang-belawan",
         zoom: 2.6,
     },
@@ -233,7 +234,10 @@ export const journeyStops: JourneyStop[] = [
             left: "-45.78%",
             top: "0%",
         }),
-        marker: "buleleng",
+        // The card hangs from the tour's easternmost village, so the villages appearing
+        // one by one stay clear of it to the west; Buleleng, where it began and ended, is ringed too.
+        marker: "karangasem",
+        also: ["buleleng"],
         series: ["buleleng", "bangli", "karangasem", "tampaksiring", "gianyar", "denpasar", "ubud", "mundu"],
         zoom: 5,
     },
