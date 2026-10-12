@@ -86,42 +86,48 @@ export const flightDuration = (from: View, to: View, viewport: Size) => {
  */
 export const clusterSpread = (k: number, base: number) => clamp((k / base - 2.2) / 1, 0, 1);
 
-/** Space between the dots of one place, centre to centre (screen px, once spread). */
-const CLUSTER_STEP = 13;
-
 /**
  * Where the dots of one place sit around it (screen px, before spreading), in
- * date order, reading left to right and down. They never move. The cluster is
- * never more than one step wide, so a card hung from any of its dots (23.5px to
- * the right) always clears the others:
- * - two dates stand one above the other,
- * - three make a triangle,
- * - four or more fill two columns.
+ * date order. They never move. Each layout is scattered by hand so it reads like
+ * places on a map rather than a grid, while staying:
+ * - no more than 15px from side to side, so a card hung the standard distance
+ *   from any of its dots (23.5px to the right) still clears the rest;
+ * - at least 12px between any two dots, so none overlap.
  */
-export const clusterLayout = (count: number): Point[] => {
-    const half = CLUSTER_STEP / 2;
-    if (count < 2) {
-        return [{ x: 0, y: 0 }];
-    }
-    if (count === 2) {
-        return [
-            { x: 0, y: -half },
-            { x: 0, y: half },
-        ];
-    }
-    if (count === 3) {
-        return [
-            { x: 0, y: -half },
-            { x: -half, y: half },
-            { x: half, y: half },
-        ];
-    }
-    const rows = Math.ceil(count / 2);
-    return Array.from({ length: count }, (_, index) => ({
-        x: index % 2 === 0 ? -half : half,
-        y: (Math.floor(index / 2) - (rows - 1) / 2) * CLUSTER_STEP,
-    }));
+const SCATTER: Record<number, Point[]> = {
+    1: [{ x: 0, y: 0 }],
+    2: [
+        { x: -2, y: -7 },
+        { x: 3, y: 6 },
+    ],
+    3: [
+        { x: 2, y: -8 },
+        { x: -6, y: 2 },
+        { x: 6, y: 7 },
+    ],
+    4: [
+        { x: -4, y: -11 },
+        { x: 6, y: -4 },
+        { x: -7, y: 3 },
+        { x: 3, y: 10 },
+    ],
+    6: [
+        { x: -3, y: -17 },
+        { x: 7, y: -9 },
+        { x: -6, y: -4 },
+        { x: 5, y: 4 },
+        { x: -8, y: 9 },
+        { x: 2, y: 18 },
+    ],
 };
+
+export const clusterLayout = (count: number): Point[] =>
+    SCATTER[count] ??
+    // Any other number of dates zigzags down in the same loose way.
+    Array.from({ length: count }, (_, index) => ({
+        x: (index % 2 === 0 ? -6 : 6) + ((index * 7) % 5) - 2,
+        y: (index - (count - 1) / 2) * 8.5,
+    }));
 
 /** Scales and moves a route's path data (an absolute M, then relative curves) onto the screen. */
 export const routeToScreen = (d: string, transform: Transform) => {
