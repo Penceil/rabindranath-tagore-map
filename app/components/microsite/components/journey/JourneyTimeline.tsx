@@ -11,17 +11,27 @@ type JourneyTimelineProps = {
     onSelect: (index: number) => void;
 };
 
-/** Where the current date sits, from the top of the band: the first date's place in the design. */
-const CURRENT_SLOT = 59;
+/**
+ * Where the current date sits, from the top of the list's window: the first
+ * date's place in the design (97px down the band), under the up arrow.
+ */
+const CURRENT_SLOT = 33;
 
 const fadeMask =
-    "[mask-image:linear-gradient(to_bottom,transparent_0,#000_52px,#000_calc(100%-56px),transparent_100%)]";
+    "[mask-image:linear-gradient(to_bottom,transparent_0,#000_30px,#000_calc(100%-40px),transparent_100%)]";
+
+const arrowButton =
+    "absolute left-1/2 flex h-[30px] w-[30px] -translate-x-1/2 items-center justify-center rounded-sm transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-default disabled:opacity-40";
 
 /**
- * The band of dates down the left of the map, as in the design: the current date
- * in white capitals, the rest in red, ruled apart. Moving on slides the list up so
- * the current date keeps the top slot, with the one before it fading out above,
- * the way Statskog's season picker scrolls.
+ * The band of dates down the left of the map, as in the design: an arrow up to the
+ * date before, the current date in white capitals, the rest in red, ruled apart,
+ * and an arrow down to the next. Moving on slides the list up so the current date
+ * keeps the top slot, the one before it fading out under the up arrow, the way
+ * Statskog's season picker scrolls.
+ *
+ * The band is 570px tall in the design and fades out before the map's foot; on a
+ * shorter screen it keeps 16px clear of the bottom instead.
  */
 export const JourneyTimelineDesktop = ({ stops, active, onSelect }: JourneyTimelineProps) => {
     const itemRefs = useRef<(HTMLLIElement | null)[]>([]);
@@ -35,14 +45,25 @@ export const JourneyTimelineDesktop = ({ stops, active, onSelect }: JourneyTimel
         }
     }, [active]);
 
+    const first = active === 0;
     const last = active === stops.length - 1;
 
     return (
         <nav
             aria-label="Dates of the journey"
-            className="absolute bottom-0 left-[62px] top-[217px] w-[198px] bg-gradient-to-b from-[rgba(205,140,63,0.6)] from-[58.589%] to-[rgba(205,140,63,0)]"
+            className="absolute left-[62px] top-[217px] h-[min(570px,calc(100%-233px))] w-[198px] bg-gradient-to-b from-[rgba(205,140,63,0.6)] from-[58.589%] to-[rgba(205,140,63,0)]"
         >
-            <div className={`absolute inset-x-0 top-0 bottom-[210px] overflow-hidden ${fadeMask}`}>
+            <button
+                type="button"
+                onClick={() => onSelect(active - 1)}
+                disabled={first}
+                aria-label="Previous date"
+                className={`${arrowButton} top-[34px] enabled:hover:opacity-70`}
+            >
+                <Image src={`${JOURNEY_ASSETS}/chevron.svg`} alt="" width={12} height={7} unoptimized className="h-[5px] w-[10px]" />
+            </button>
+
+            <div className={`absolute inset-x-0 top-[64px] bottom-[114px] overflow-hidden ${fadeMask}`}>
                 <motion.ol
                     className="relative px-5"
                     animate={{ y: offset }}
@@ -79,9 +100,7 @@ export const JourneyTimelineDesktop = ({ stops, active, onSelect }: JourneyTimel
                 onClick={() => onSelect(active + 1)}
                 disabled={last}
                 aria-label="Next date"
-                className={`absolute bottom-[169px] left-1/2 flex h-[30px] w-[30px] -translate-x-1/2 items-center justify-center rounded-sm transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-white ${
-                    last ? "opacity-0" : "opacity-100 hover:opacity-70"
-                }`}
+                className={`${arrowButton} bottom-[69px] enabled:hover:opacity-70`}
             >
                 <Image
                     src={`${JOURNEY_ASSETS}/chevron.svg`}

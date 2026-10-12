@@ -141,12 +141,7 @@ export const journeyStops: JourneyStop[] = [
             "Sets out on a three-and-a-half-month Southeast Asian tour, framed as a cultural mission of Visva Bharati University, Santiniketan.",
         more: "Travels with philologist Suniti Kumar Chatterji, artist-photographer-architect Surendranath Kar, and painter-musician Dhirendra Krishna Deva Varman. Twin aims: study surviving remains of Indian civilization in the region, and build cultural cooperation. At a Calcutta send-off he called it 'a pilgrimage to India beyond its modern political boundaries.'",
         size: "large",
-        image: image("calcutta-portrait.jpg", "Portrait of Rabindranath Tagore", 166, {
-            width: "233.22%",
-            height: "100%",
-            left: "0.17%",
-            top: "-0.26%",
-        }),
+        // No photograph: the first card in the design's Key Moments has none.
         marker: "calcutta",
         zoom: 1,
     },
