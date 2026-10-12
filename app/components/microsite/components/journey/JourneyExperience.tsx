@@ -142,19 +142,13 @@ const ringedKeys = (index: number) => {
 };
 
 /**
- * Where the stop's own dot settles, in map units: on its place, or for one
- * anecdote of many, at its spot around the place once the camera has closed in.
+ * Where the camera looks for a stop: its place. For a place with several dates
+ * that is the middle of its dots, not the date's own dot, so moving from one date
+ * to the next there leaves the map still; only the ring and the card move.
  */
-const focusOf = (index: number, viewport: Size): Point => {
-    const stop = journeyStops[index];
-    const place = journeyPlaces[stop.marker];
-    const offset = dotByKey.get(dotKeyFor(stop.marker, index))?.offset;
-    if (!offset) {
-        return { x: place.x, y: place.y };
-    }
-    const k = toTransform({ focus: place, zoom: stop.zoom }, viewport, { x: 0, y: 0 }).k;
-    const spreadAmount = clusterSpread(k, baseScale(viewport));
-    return { x: place.x + (offset.x * spreadAmount) / k, y: place.y + (offset.y * spreadAmount) / k };
+const focusOf = (index: number): Point => {
+    const place = journeyPlaces[journeyStops[index].marker];
+    return { x: place.x, y: place.y };
 };
 
 const routeStopIndex = (route: JourneyRouteId) => journeyStops.findIndex((stop) => stop.route === route);
@@ -166,7 +160,9 @@ const anchorFor = (index: number, viewport: Size, desktop: boolean): Point => {
         return { x: viewport.width / 2, y: Math.max(200, (172 + viewport.height * 0.54) / 2) };
     }
     const stop = journeyStops[index];
-    const reach = CARD_OFFSET.x + CARD_WIDTH[stop.size] + (stop.image ? stop.image.width - IMAGE_OVERLAP.x : 0);
+    // The card hangs from the date's own dot, which can sit a little east of the place.
+    const nudge = Math.max(dotByKey.get(dotKeyFor(stop.marker, index))?.offset?.x ?? 0, 0);
+    const reach = nudge + CARD_OFFSET.x + CARD_WIDTH[stop.size] + (stop.image ? stop.image.width - IMAGE_OVERLAP.x : 0);
 
     return {
         x: Math.min(viewport.width * 0.4948, viewport.width - 24 - reach),
@@ -456,7 +452,7 @@ const JourneyExperience = () => {
         setMoving(!instant);
         setMoreOpen(false);
         const forward = from !== null && from < active;
-        const target: View = { focus: focusOf(active, viewportRef.current), zoom: stop.zoom };
+        const target: View = { focus: focusOf(active), zoom: stop.zoom };
         const targetAnchor = anchorFor(active, viewportRef.current, viewportRef.current.width >= DESKTOP_MIN);
 
         // Crossings already sailed stay drawn; those ahead are taken back off the map.
@@ -590,10 +586,11 @@ const JourneyExperience = () => {
         const fit = () => {
             const stage = viewportRef.current;
             const anchor = anchorRef.current;
-            const top = anchor.y + CARD_OFFSET.y;
+            // Measured from where the card really is, since it hangs from the date's own dot.
+            const top = cardY.get();
             const overflow = top + card.offsetHeight - (stage.height - 24);
-            const highest = -CARD_OFFSET.y + (journeyStops[active].image ? IMAGE_OVERLAP.y : 0) + 16;
-            const wanted = Math.max(highest, anchor.y - Math.max(overflow, 0));
+            const room = top - (journeyStops[active].image ? IMAGE_OVERLAP.y : 0) - 16;
+            const wanted = anchor.y - Math.min(Math.max(overflow, 0), Math.max(room, 0));
             if (Math.abs(wanted - anchor.y) < 1) {
                 return;
             }
@@ -612,7 +609,7 @@ const JourneyExperience = () => {
         const observer = new ResizeObserver(fit);
         observer.observe(card);
         return () => observer.disconnect();
-    }, [active, arrived, desktop, applyView, reduceMotion]);
+    }, [active, arrived, desktop, applyView, reduceMotion, cardY]);
 
     const stop = stops[active];
     const showCard = arrived === active;
