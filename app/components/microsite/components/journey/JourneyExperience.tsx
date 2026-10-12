@@ -23,8 +23,7 @@ import {
     baseScale,
     clusterLayout,
     clusterSpread,
-    flightDuration,
-    interpolateView,
+    flightPath,
     toTransform,
     type Point,
     type Size,
@@ -45,8 +44,12 @@ const CARD_OFFSET = { x: 23.5, y: -13.5 };
 /** Below this width the page uses its phone layout; the same breakpoint as the rest of the site. */
 const DESKTOP_MIN = 992;
 
-const EASE_FLIGHT: BezierDefinition = [0.65, 0, 0.35, 1];
-const EASE_VOYAGE: BezierDefinition = [0.45, 0, 0.55, 1];
+/**
+ * A soft ease in and out (CSS's own ease-in-out) for every camera move: it
+ * gathers speed gently and settles gently, rather than lurching from rest.
+ */
+const EASE_FLIGHT: BezierDefinition = [0.42, 0, 0.58, 1];
+const EASE_VOYAGE: BezierDefinition = [0.42, 0, 0.58, 1];
 
 const routeIds = Object.keys(journeyRoutes) as JourneyRouteId[];
 const placeIds = Object.keys(journeyPlaces) as JourneyPlaceId[];
@@ -472,15 +475,15 @@ const JourneyExperience = () => {
 
         const fly = (to: View, anchor: Point) =>
             new Promise<void>((resolve) => {
-                const startView = viewRef.current;
                 const startAnchor = anchorRef.current;
+                const path = flightPath(viewRef.current, to, viewportRef.current);
                 run.controls.push(
                     animate(0, 1, {
-                        duration: flightDuration(startView, to, viewportRef.current),
+                        duration: path.duration,
                         ease: EASE_FLIGHT,
                         onUpdate: (t) => {
                             anchorRef.current = lerpPoint(startAnchor, anchor, t);
-                            applyView(interpolateView(startView, to, t, viewportRef.current));
+                            applyView(path.at(t));
                         },
                         onComplete: resolve,
                     })
@@ -597,7 +600,7 @@ const JourneyExperience = () => {
             const from = anchor.y;
             timers.current.controls.push(
                 animate(0, 1, {
-                    duration: reduceMotion ? 0 : 0.45,
+                    duration: reduceMotion ? 0 : 0.6,
                     ease: EASE_FLIGHT,
                     onUpdate: (t) => {
                         anchorRef.current = { x: anchor.x, y: from + (wanted - from) * t };

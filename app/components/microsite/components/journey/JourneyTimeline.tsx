@@ -67,7 +67,7 @@ export const JourneyTimelineDesktop = ({ stops, active, onSelect }: JourneyTimel
                 <motion.ol
                     className="relative px-5"
                     animate={{ y: offset }}
-                    transition={reduceMotion ? { duration: 0 } : { duration: 0.6, ease: [0.65, 0, 0.35, 1] }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.8, ease: [0.42, 0, 0.58, 1] }}
                 >
                     {stops.map((stop, index) => (
                         <Fragment key={stop.id}>

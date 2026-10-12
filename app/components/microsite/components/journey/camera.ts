@@ -26,7 +26,6 @@ export type View = { focus: Point; zoom: number };
 export type Transform = { x: number; y: number; k: number };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
-const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 
 /** Pixels per map unit at zoom 1: the Figma framing, kept as the screen changes shape. */
 export const baseScale = (viewport: Size) =>
@@ -51,33 +50,62 @@ export const toTransform = (view: View, viewport: Size, anchor: Point): Transfor
 };
 
 /**
- * A view part-way through a flight. The focus moves in a straight line while the
- * zoom changes geometrically, and long hops pull back in the middle so the move
- * reads as travel across the map rather than a slide.
+ * How much a long flight pulls back to show where it is going: the curvature of
+ * the path below. Lower is flatter; d3's default is √2.
  */
-export const interpolateView = (from: View, to: View, t: number, viewport: Size): View => {
-    const zoom = from.zoom * Math.pow(to.zoom / from.zoom, t);
-    const distance =
-        Math.hypot(to.focus.x - from.focus.x, to.focus.y - from.focus.y) *
-        baseScale(viewport) *
-        Math.min(from.zoom, to.zoom);
-    const pullBack = clamp(distance / (viewport.width * 2.2), 0, 0.5);
+const RHO = 1.2;
 
-    return {
-        focus: { x: lerp(from.focus.x, to.focus.x, t), y: lerp(from.focus.y, to.focus.y, t) },
-        zoom: zoom * (1 - pullBack * Math.sin(Math.PI * t)),
-    };
-};
+/**
+ * A flight from one view to another along van Wijk and Nuij's "smooth and
+ * efficient zooming and panning" path, the curve d3-zoom and map libraries fly
+ * along. Panning and zooming are one motion rather than two: the camera keeps an
+ * even perceived speed and eases back only as far as the distance needs, so a
+ * hop reads as a soft glide across the map.
+ *
+ * `at(t)` gives the view for t from 0 to 1; `duration` is in seconds.
+ */
+export const flightPath = (from: View, to: View, viewport: Size) => {
+    // The path works in the width of map the screen shows, rather than in zoom.
+    const toWidth = (zoom: number) => viewport.width / (baseScale(viewport) * zoom);
+    const toZoom = (width: number) => viewport.width / (baseScale(viewport) * width);
+    const w0 = toWidth(from.zoom);
+    const w1 = toWidth(to.zoom);
+    const dx = to.focus.x - from.focus.x;
+    const dy = to.focus.y - from.focus.y;
+    const d2 = dx * dx + dy * dy;
+    const rho2 = RHO * RHO;
 
-/** Seconds for a flight: short hops are quick, crossing the map takes longer. */
-export const flightDuration = (from: View, to: View, viewport: Size) => {
-    const distance =
-        Math.hypot(to.focus.x - from.focus.x, to.focus.y - from.focus.y) *
-        baseScale(viewport) *
-        Math.max(from.zoom, to.zoom);
-    const zoomChange = Math.abs(Math.log(to.zoom / from.zoom));
+    let length: number;
+    let at: (t: number) => View;
 
-    return clamp(0.7 + distance / 1800 + zoomChange * 0.35, 0.7, 1.9);
+    if (d2 < 1e-12) {
+        // Zooming on the spot.
+        length = Math.log(w1 / w0) / RHO;
+        at = (t) => ({ focus: from.focus, zoom: toZoom(w0 * Math.exp(RHO * t * length)) });
+    } else {
+        const d1 = Math.sqrt(d2);
+        const b0 = (w1 * w1 - w0 * w0 + rho2 * rho2 * d2) / (2 * w0 * rho2 * d1);
+        const b1 = (w1 * w1 - w0 * w0 - rho2 * rho2 * d2) / (2 * w1 * rho2 * d1);
+        const r0 = Math.log(Math.sqrt(b0 * b0 + 1) - b0);
+        const r1 = Math.log(Math.sqrt(b1 * b1 + 1) - b1);
+        length = (r1 - r0) / RHO;
+        at = (t) => {
+            const s = t * length;
+            const u = (w0 / (rho2 * d1)) * (Math.cosh(r0) * Math.tanh(RHO * s + r0) - Math.sinh(r0));
+            return {
+                focus: { x: from.focus.x + u * dx, y: from.focus.y + u * dy },
+                zoom: toZoom((w0 * Math.cosh(r0)) / Math.cosh(RHO * s + r0)),
+            };
+        };
+    }
+
+    // Seconds: about one for the shortest hops, two for crossing the map. With
+    // nowhere to go (the next date at the same place) it is only the pause while
+    // the card changes.
+    const span = Math.abs(length);
+    const duration = span < 0.005 ? 0.5 : clamp(0.95 + span * 1.4, 1, 2.2);
+
+    return { at, duration };
 };
 
 /**
