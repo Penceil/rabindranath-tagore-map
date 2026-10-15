@@ -21,6 +21,8 @@ type JourneyRoutesProps = {
     marching: JourneyRouteId[];
     /** Untransformed copies of the paths, for measuring points along them in map units. */
     geometry: RouteGeometry;
+    /** Each leg's path data in map units, its ends on the dots it joins. */
+    paths: Record<JourneyRouteId, string>;
 };
 
 const routeIds = Object.keys(journeyRoutes) as JourneyRouteId[];
@@ -38,7 +40,7 @@ const REVEAL_WIDTH = 4;
  * costs a single transform per frame. Their strokes do not scale with it, which
  * keeps the line and its dashes the same weight at every zoom.
  */
-const JourneyRoutes = ({ camera, progress, marching, geometry }: JourneyRoutesProps) => {
+const JourneyRoutes = ({ camera, progress, marching, geometry, paths }: JourneyRoutesProps) => {
     // React's ids carry colons, which a url(#...) reference does not accept.
     const maskId = `route${useId().replace(/:/g, "")}`;
     const groupRef = useRef<SVGGElement>(null);
@@ -106,7 +108,7 @@ const JourneyRoutes = ({ camera, progress, marching, geometry }: JourneyRoutesPr
                             <mask key={id} id={`${maskId}-${id}`} maskUnits="userSpaceOnUse" x={-200} y={-200} width={3500} height={2200}>
                                 <path
                                     ref={(element) => (maskRefs.current[id] = element)}
-                                    d={journeyRoutes[id].d}
+                                    d={paths[id]}
                                     fill="none"
                                     stroke="#fff"
                                     strokeWidth={REVEAL_WIDTH}
@@ -119,7 +121,7 @@ const JourneyRoutes = ({ camera, progress, marching, geometry }: JourneyRoutesPr
                         <path
                             key={id}
                             ref={(element) => (dashRefs.current[id] = element)}
-                            d={journeyRoutes[id].d}
+                            d={paths[id]}
                             fill="none"
                             stroke={journeyRoutes[id].kind === "sea" ? "#6a1b1d" : "#ffffff"}
                             strokeWidth={1.5}
@@ -138,7 +140,7 @@ const JourneyRoutes = ({ camera, progress, marching, geometry }: JourneyRoutesPr
             {/* Measuring copies, in map units, never shown. */}
             <svg aria-hidden className="absolute h-0 w-0 overflow-hidden">
                 {routeIds.map((id) => (
-                    <path key={id} ref={(element) => (geometry.current[id] = element)} d={journeyRoutes[id].d} />
+                    <path key={id} ref={(element) => (geometry.current[id] = element)} d={paths[id]} />
                 ))}
             </svg>
         </>

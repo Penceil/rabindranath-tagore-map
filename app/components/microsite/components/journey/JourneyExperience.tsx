@@ -22,6 +22,7 @@ import {
     MAP_DETAIL,
     MAP_IMAGE,
     baseScale,
+    attachEnds,
     clusterLayout,
     clusterSpread,
     flightPath,
@@ -60,7 +61,11 @@ type MapDotData = {
     place: JourneyPlaceId;
     x: number;
     y: number;
-    /** For one anecdote of many: where it sits around its place (screen px, before spreading). */
+    /**
+     * For one anecdote of many: where it sits around its place, in map units. The
+     * layout is drawn in screen px for the zoom the place is read at, so the dots
+     * stand apart there and gather into one as the map zooms out.
+     */
     offset?: Point;
     /** The stop this dot opens. */
     stop: number;
@@ -81,6 +86,13 @@ const clusterMembers = placeIds.reduce<Partial<Record<JourneyPlaceId, number[]>>
     return members.length ? { ...groups, [id]: members } : groups;
 }, {});
 
+/** Pixels per map unit at zoom 1 on the 1440px screen the layouts are drawn for. */
+const LAYOUT_SCALE = 0.872;
+
+/** The zoom a many-anecdote place is read at: its closest stop. */
+const clusterZoom = (place: JourneyPlaceId) =>
+    Math.max(...(clusterMembers[place] ?? []).map((index) => journeyStops[index].zoom));
+
 /** The first stop a place belongs to, so a single dot can open it. */
 const firstStopAt = (place: JourneyPlaceId) =>
     journeyStops.findIndex(
@@ -93,12 +105,13 @@ const mapDots = placeIds.flatMap<MapDotData>((id) => {
 
     if (members) {
         const layout = clusterLayout(members.length);
+        const perUnit = LAYOUT_SCALE * clusterZoom(id);
         return members.map((stop, index) => ({
             key: `${id}-${stop}`,
             place: id,
             x: place.x,
             y: place.y,
-            offset: layout[index],
+            offset: { x: layout[index].x / perUnit, y: layout[index].y / perUnit },
             stop,
             label: `${place.name}, ${journeyStops[stop].date}`,
             size: DOT_SIZE[place.size],
@@ -139,6 +152,35 @@ const dotKeyFor = (place: JourneyPlaceId, index: number) => {
     return `${place}-${next}`;
 };
 
+/** The dot a leg sets out from: for a place with several dates, the last one before it leaves. */
+const departureKeyFor = (place: JourneyPlaceId, index: number) => {
+    const members = clusterMembers[place];
+    if (!members) {
+        return place;
+    }
+    return `${place}-${[...members].reverse().find((member) => member <= index) ?? members[0]}`;
+};
+
+const dotPosition = (key: string): Point | undefined => {
+    const dot = dotByKey.get(key);
+    return dot && { x: dot.x + (dot.offset?.x ?? 0), y: dot.y + (dot.offset?.y ?? 0) };
+};
+
+/**
+ * Every leg's path with its ends drawn exactly onto the dots it joins: the dot of
+ * the date it leaves from and of the date it arrives at.
+ */
+const routePaths = Object.fromEntries(
+    routeIds.map((id) => {
+        const { d, from, to } = journeyRoutes[id];
+        const index = journeyStops.findIndex((stop) => stop.routes?.includes(id));
+        return [
+            id,
+            attachEnds(d, from && dotPosition(departureKeyFor(from, index)), to && dotPosition(dotKeyFor(to, index))),
+        ];
+    })
+) as Record<JourneyRouteId, string>;
+
 /** The dots a stop rings with the dashed circle: its own, and the other places it names. */
 const ringedKeys = (index: number) => {
     const stop = journeyStops[index];
@@ -165,7 +207,7 @@ const anchorFor = (index: number, viewport: Size, desktop: boolean): Point => {
     }
     const stop = journeyStops[index];
     // The card hangs from the date's own dot, which can sit a little east of the place.
-    const nudge = Math.max(dotByKey.get(dotKeyFor(stop.marker, index))?.offset?.x ?? 0, 0);
+    const nudge = Math.max((dotByKey.get(dotKeyFor(stop.marker, index))?.offset?.x ?? 0) * baseScale(viewport) * stop.zoom, 0);
     const reach = nudge + CARD_OFFSET.x + CARD_WIDTH[stop.size] + (stop.image ? stop.image.width - IMAGE_OVERLAP.x : 0);
 
     return {
@@ -193,8 +235,8 @@ type MapDotProps = {
  * dashed gold ring.
  */
 const MapDot = memo(({ dot, camera, ringed, revealed, onSelect }: MapDotProps) => {
-    const x = useDerived([camera.x, camera.k, camera.spread], ([cx, k, s]) => dot.x * k + cx + (dot.offset?.x ?? 0) * s);
-    const y = useDerived([camera.y, camera.k, camera.spread], ([cy, k, s]) => dot.y * k + cy + (dot.offset?.y ?? 0) * s);
+    const x = useDerived([camera.x, camera.k], ([cx, k]) => (dot.x + (dot.offset?.x ?? 0)) * k + cx);
+    const y = useDerived([camera.y, camera.k], ([cy, k]) => (dot.y + (dot.offset?.y ?? 0)) * k + cy);
     // Anecdote dots sit on top of one another at their place's size in the overview,
     // and settle a little smaller as they spread out around it.
     const scale = useDerived([camera.spread], ([s]) => (dot.offset ? 1 + (ANECDOTE_SIZE / dot.size - 1) * s : 1));
@@ -302,19 +344,13 @@ const JourneyExperience = () => {
 
     // The open card hangs the same distance from its dot on every stop, as in the
     // design: 23.5px right of the dot's centre, its top 13.5px above it. The dot is
-    // its place (map units), plus its spot around the place for an anecdote (px).
+    // its place, plus its spot around the place for an anecdote (both in map units).
     const cardPlaceX = useMotionValue(0);
     const cardPlaceY = useMotionValue(0);
     const cardOffsetX = useMotionValue(0);
     const cardOffsetY = useMotionValue(0);
-    const cardX = useDerived(
-        [cameraX, cameraK, spread, cardPlaceX, cardOffsetX],
-        ([cx, k, s, px, ox]) => px * k + cx + ox * s + CARD_OFFSET.x
-    );
-    const cardY = useDerived(
-        [cameraY, cameraK, spread, cardPlaceY, cardOffsetY],
-        ([cy, k, s, py, oy]) => py * k + cy + oy * s + CARD_OFFSET.y
-    );
+    const cardX = useDerived([cameraX, cameraK, cardPlaceX, cardOffsetX], ([cx, k, px, ox]) => (px + ox) * k + cx + CARD_OFFSET.x);
+    const cardY = useDerived([cameraY, cameraK, cardPlaceY, cardOffsetY], ([cy, k, py, oy]) => (py + oy) * k + cy + CARD_OFFSET.y);
 
     const applyView = useCallback(
         (view: View) => {
@@ -517,7 +553,8 @@ const JourneyExperience = () => {
 
                 run.controls.push(
                     animate(0, 1, {
-                        duration: Math.min(Math.max(1.2 + onScreen / 650, 1.3), 3.4),
+                        // Long voyages (Calcutta round to Singapore) take their time.
+                        duration: Math.min(Math.max(1.2 + onScreen / 650 + Math.max(onScreen - 700, 0) / 150, 1.3), 5),
                         ease: EASE_FLIGHT,
                         onUpdate: (t) => {
                             let left = t * total;
@@ -725,6 +762,7 @@ const JourneyExperience = () => {
                             progress={progress}
                             marching={showCard ? stop.routes ?? [] : []}
                             geometry={geometry}
+                            paths={routePaths}
                         />
 
                         <div className="absolute inset-0" role="group" aria-label="Places on the map">

@@ -230,3 +230,44 @@ export const smoothTrack = (from: Point, line: Point[], to: Point) => {
     const track = resample(pinned, SAMPLES);
     return { at: (f: number) => track.at(clamp(f, 0, 1) * track.total), length: track.total };
 };
+
+/**
+ * A line's path data (an absolute M, then relative curves) with its ends moved
+ * exactly onto `start` and `end`, carrying the neighbouring control points along
+ * so the line keeps its shape. Either end may be left where it is.
+ */
+export const attachEnds = (d: string, start?: Point, end?: Point) => {
+    const [move, curves] = d.slice(1).split("c");
+    const [x0, y0] = move.split(",").map(Number);
+    const values = (curves.match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi) ?? []).map(Number);
+
+    // To absolute cubic segments: [from, control 1, control 2, to].
+    const segments: Point[][] = [];
+    let current = { x: x0, y: y0 };
+    for (let i = 0; i + 5 < values.length; i += 6) {
+        const at = (dx: number, dy: number) => ({ x: current.x + dx, y: current.y + dy });
+        const segment = [current, at(values[i], values[i + 1]), at(values[i + 2], values[i + 3]), at(values[i + 4], values[i + 5])];
+        segments.push(segment);
+        current = segment[3];
+    }
+    if (!segments.length) {
+        return d;
+    }
+    const shift = (point: Point, by: Point) => ({ x: point.x + by.x, y: point.y + by.y });
+    if (start) {
+        const first = segments[0];
+        const by = { x: start.x - first[0].x, y: start.y - first[0].y };
+        segments[0] = [start, shift(first[1], by), first[2], first[3]];
+    }
+    if (end) {
+        const last = segments[segments.length - 1];
+        const by = { x: end.x - last[3].x, y: end.y - last[3].y };
+        segments[segments.length - 1] = [last[0], last[1], shift(last[2], by), end];
+    }
+
+    const round = (value: number) => Math.round(value * 100) / 100;
+    const relative = segments.flatMap(([from, c1, c2, to]) =>
+        [c1, c2, to].flatMap((point) => [round(point.x - from.x), round(point.y - from.y)])
+    );
+    return `M${round(segments[0][0].x)},${round(segments[0][0].y)}c${relative.join(",")}`;
+};
