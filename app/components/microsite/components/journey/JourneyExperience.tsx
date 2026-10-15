@@ -25,6 +25,7 @@ import {
     clusterLayout,
     clusterSpread,
     flightPath,
+    smoothTrack,
     toTransform,
     type Point,
     type Size,
@@ -50,7 +51,6 @@ const DESKTOP_MIN = 992;
  * gathers speed gently and settles gently, rather than lurching from rest.
  */
 const EASE_FLIGHT: BezierDefinition = [0.42, 0, 0.58, 1];
-const EASE_VOYAGE: BezierDefinition = [0.42, 0, 0.58, 1];
 
 const routeIds = Object.keys(journeyRoutes) as JourneyRouteId[];
 const placeIds = Object.keys(journeyPlaces) as JourneyPlaceId[];
@@ -489,22 +489,47 @@ const JourneyExperience = () => {
                 );
             });
 
-        const sail = (route: JourneyRouteId) =>
+        // A date with travel lines is one continuous glide: the camera eases along the
+        // lines (smoothed, so their wiggles never shake it) from where it stands to
+        // the place, while the lines draw in step, one leg running into the next.
+        const travel = (legs: JourneyRouteId[], to: View, anchor: Point) =>
             new Promise<void>((resolve) => {
-                const shape = geometry.current[route];
-                const length = shape?.getTotalLength() ?? 0;
+                const shapes = legs.map((leg) => geometry.current[leg]);
+                const lengths = shapes.map((shape) => shape?.getTotalLength() ?? 0);
+                const total = lengths.reduce((sum, length) => sum + length, 0);
+                const line: Point[] = [];
+                shapes.forEach((shape, i) => {
+                    const steps = Math.max(8, Math.ceil(lengths[i] / 4));
+                    for (let step = 0; shape && step <= steps; step++) {
+                        const point = shape.getPointAtLength((lengths[i] * step) / steps);
+                        line.push({ x: point.x, y: point.y });
+                    }
+                });
+
+                const from = viewRef.current;
+                const track = smoothTrack(from.focus, line, to.focus);
+                const viewport = viewportRef.current;
+                // How far the glide runs on screen sets its length, and how far the camera
+                // eases back mid-way to show the lines around it.
+                const onScreen = track.length * baseScale(viewport) * Math.sqrt(from.zoom * to.zoom);
+                const pullBack = Math.min(onScreen / (viewport.width * 2.4), 0.42);
+                const startAnchor = anchorRef.current;
+
                 run.controls.push(
                     animate(0, 1, {
-                        // By its length on screen at this stop's zoom: a short walk across
-                        // Jogjakarta under a second, a long voyage nearly three.
-                        duration: Math.min(Math.max((length * baseScale(viewportRef.current) * stop.zoom) / 300, 0.9), 2.8),
-                        ease: EASE_VOYAGE,
-                        onUpdate: (drawn) => {
-                            progress[route].set(drawn);
-                            if (shape) {
-                                const point = shape.getPointAtLength(drawn * length);
-                                applyView({ focus: { x: point.x, y: point.y }, zoom: stop.zoom });
-                            }
+                        duration: Math.min(Math.max(1.2 + onScreen / 650, 1.3), 3.4),
+                        ease: EASE_FLIGHT,
+                        onUpdate: (t) => {
+                            let left = t * total;
+                            legs.forEach((leg, i) => {
+                                progress[leg].set(lengths[i] ? Math.min(Math.max(left / lengths[i], 0), 1) : 1);
+                                left -= lengths[i];
+                            });
+                            anchorRef.current = lerpPoint(startAnchor, anchor, t);
+                            applyView({
+                                focus: track.at(t),
+                                zoom: from.zoom * Math.pow(to.zoom / from.zoom, t) * (1 - pullBack * Math.sin(Math.PI * t)),
+                            });
                         },
                         onComplete: resolve,
                     })
@@ -545,22 +570,10 @@ const JourneyExperience = () => {
                 return;
             }
             if (stop.routes && forward) {
-                // Fly to where the first leg sets out, then follow each leg in turn.
-                const start = geometry.current[stop.routes[0]]?.getPointAtLength(0);
-                if (start) {
-                    await fly({ focus: { x: start.x, y: start.y }, zoom: stop.zoom }, targetAnchor);
-                    for (const leg of stop.routes) {
-                        if (run.cancelled) {
-                            return;
-                        }
-                        await sail(leg);
-                    }
-                    if (run.cancelled) {
-                        return;
-                    }
-                }
+                await travel(stop.routes, target, targetAnchor);
+            } else {
+                await fly(target, targetAnchor);
             }
-            await fly(target, targetAnchor);
             arrive();
         };
 

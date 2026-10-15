@@ -221,6 +221,12 @@ export type JourneyStop = {
     zoom: number;
 };
 
+/**
+ * For photographs cut from the design exactly as cropped there: the picture fills
+ * its frame as it is.
+ */
+const FULL_FRAME: JourneyImage["crop"] = { width: "100%", height: "100%", left: "0%", top: "0%" };
+
 const image = (
     file: string,
     alt: string,
@@ -283,6 +289,7 @@ export const journeyStops: JourneyStop[] = [
         summary:
             "Crosses from Penang to Belawan; spends a few hours in Medan, then sails for Java on the boat Plancius the same day.",
         size: "large",
+        image: image("penang-belawan.jpg", "A colonial-era palace behind a formal garden", 198, FULL_FRAME),
         // The crossing ends at Belawan; Medan, a few hours inland, is the day's last stop.
         marker: "medan",
         routes: ["penang-belawan", "belawan-medan"],
@@ -296,6 +303,7 @@ export const journeyStops: JourneyStop[] = [
         summary: "Arrives in Batavia.",
         more: "Welcomed by Mr and Mrs Bake, Dr F.D.K. Bosch and Dr Hoesein Djajadiningrat. The Kunstkring hosts a reception; a dinner given by British Consul Mr Crosby lets the party meet local intellectuals and Indian & Chinese businessmen.",
         size: "small",
+        image: image("batavia-arrival.jpg", "A colonial building with twin towers and an arched porch", 166, FULL_FRAME),
         marker: "batavia",
         routes: ["medan-sumatra", "sumatra-batavia"],
         cluster: "batavia",
@@ -365,6 +373,7 @@ export const journeyStops: JourneyStop[] = [
             "Meets about fifteen educated Javanese at a gathering arranged by Raden M. Harjo Soejono (son of the Mangkoenegoro).",
         more: "These 'Swarajist' nationalists asked whether an East-West union was possible amid continued Western dominance and exploitation. Tagore answered that union was impossible along the path of competition for power and goods, but possible on the intellectual and spiritual plane. The discussion lasted two hours.",
         size: "large",
+        image: image("surabaya-gathering.jpg", "A painted portrait of a Javanese nobleman seated in a carved chair", 166, FULL_FRAME),
         marker: "surabaya",
         cluster: "surabaya",
         zoom: 3.6,
@@ -376,6 +385,7 @@ export const journeyStops: JourneyStop[] = [
         summary:
             "Chatterji lectures the Indonesische Studieclub on Santiniketan and Indian education; that same evening Tagore speaks on 'What is art?' at the local Kunstkring.",
         size: "large",
+        image: image("surabaya-lectures.jpg", "A large group gathered for a formal photograph", 198, FULL_FRAME),
         marker: "surabaya",
         cluster: "surabaya",
         zoom: 3.6,
@@ -406,6 +416,7 @@ export const journeyStops: JourneyStop[] = [
         summary: "Visit to the Java Instituut.",
         more: "Meets the celebrated young Dutch scholar of medieval Javanese religion and literature, Dr Theodore Gautier Thomas Pigeaud.",
         size: "small",
+        image: image("java-instituut.jpg", "A group of men and women seated outdoors", 166, FULL_FRAME),
         marker: "surakarta",
         cluster: "surakarta",
         zoom: 4.5,
@@ -417,6 +428,7 @@ export const journeyStops: JourneyStop[] = [
         summary: "Grand reception; Tagore lectures at the Kunstkring on India's attitude to conflict between nations.",
         more: "Meets Dutch engineer J.J. Moens and noted architect T. Karsten. A folder with his Java poem in English and Dutch translation, autographed by poet and Mangkoenegoro, is distributed.",
         size: "large",
+        image: image("grand-reception.jpg", "A signed folder printing the Java poem", 198, FULL_FRAME),
         marker: "surakarta",
         cluster: "surakarta",
         zoom: 4.5,
@@ -429,6 +441,7 @@ export const journeyStops: JourneyStop[] = [
             "Meets Dutch authority W.F. Stutterheim; visits the Van Deventer School for Javanese girls; watches a Wajang Poerwa (shadow-theatre) performance at Prince Koesoemajoedo's house.",
         more: "Reflected that Javanese dance and shadow-play are 'the language of their history and their annals.' Watching the shadows he wrote of 'the dance of Mahamaya on the body of the prostrate Shiva.' Stutterheim favoured teaching Sanskrit and Kawi; the idea of Indian help interpreting Balinese inscriptions was raised.",
         size: "large",
+        image: image("wajang-poerwa.jpg", "Girls at work around tables in a schoolroom", 198, FULL_FRAME),
         marker: "surakarta",
         cluster: "surakarta",
         zoom: 4.5,
@@ -440,6 +453,7 @@ export const journeyStops: JourneyStop[] = [
         summary: "Reception with Javanese poets at the Contact Club before departure.",
         more: "Poems from his Katha o Kahini (Stories and Fables) were recited in Dutch and Javanese; a Javanese poet's reply to his Java poem was read out and sung. The Surakarta experience was a high point of the Java visit.",
         size: "medium",
+        image: image("contact-club.jpg", "The title Katha o Kahini in Bengali, with Tagore's signature", 166, FULL_FRAME),
         marker: "surakarta",
         cluster: "surakarta",
         zoom: 4.5,
@@ -470,6 +484,7 @@ export const journeyStops: JourneyStop[] = [
         summary: "Arrives around 11:30 a.m.; hosted by the Pakoe Alam.",
         more: "A Serimpi dance (a group dance for four girls) is performed - Tagore thought it the best dance he had seen so far in Java. Dinner served at the unusual hour of 11 p.m. He learned young Indonesian Muslims were now going to India, besides Mecca, to study Islam.",
         size: "medium",
+        image: image("pakoe-alam.jpg", "Dancers performing in a pavilion", 166, FULL_FRAME),
         marker: "jogjakarta",
         cluster: "jogjakarta",
         zoom: 4.5,
@@ -482,6 +497,7 @@ export const journeyStops: JourneyStop[] = [
             "Chatterji and Deva Varman visit Tjandi Loembeng, Sewoe, Plaosan and Kalasan with Bosch and Van Stein Callenfels, plus a further trip to Prambanan.",
         more: "Meet Mr Van Haan, engineer in charge of the Prambanan restoration. The party was delighted that Prambanan's Ramayana reliefs had no Indian temple parallel, and intrigued that the Javanese reliefs diverged from the Bhagavata text and showed Puranic tales unknown in India. They witnessed the 'miracle' of cross-cultural temple reconstruction, credited to the Netherlands East Indies government.",
         size: "large",
+        image: image("prambanan.jpg", "The temples of Prambanan rising above scattered stones", 166, FULL_FRAME),
         marker: "prambanan",
         routes: ["jogjakarta-prambanan"],
         zoom: 4.5,
@@ -545,6 +561,7 @@ export const journeyStops: JourneyStop[] = [
         summary: "Last day in Jogjakarta; an encounter with Islamic modernism.",
         more: "Marathi-speaking Mirza Ali Baig, a link between Javanese and Indian Muslims, invites Chatterji to the Muhammadiya. Chatterji notes 32 Dutch-Javanese and 60 primary schools under Muhammadiya sponsorship, and visits a Muslim girls' school founded by a Mrs Dachlan.",
         size: "medium",
+        image: image("islamic-modernism.jpg", "A man seated at a desk before shelves of books", 166, FULL_FRAME),
         marker: "jogjakarta",
         cluster: "jogjakarta",
         zoom: 4.5,
@@ -556,6 +573,7 @@ export const journeyStops: JourneyStop[] = [
         summary: "Arrives at the cool mountain resort of Bandung with Pigeaud and Koperberg on the return trip.",
         more: "A much-longed-for respite from the hot Javanese and Balinese summer.",
         size: "large",
+        image: image("bandung-arrival.jpg", "An aerial view of a town", 198, FULL_FRAME),
         marker: "bandung",
         routes: ["borobudur-bandung"],
         cluster: "bandung",
@@ -567,6 +585,7 @@ export const journeyStops: JourneyStop[] = [
         place: "BANDUNG",
         summary: "Gives a talk on art at the local Kunstkring.",
         size: "medium",
+        image: image("bandung-kunstkring.jpg", "Two album photographs of town streets", 166, FULL_FRAME),
         marker: "bandung",
         cluster: "bandung",
         zoom: 3.6,
@@ -579,6 +598,7 @@ export const journeyStops: JourneyStop[] = [
             "Visits the theosophical teacher-training centre Goenoeng Sari (a pan-religious prayer meeting); has an unscheduled meeting with young nationalist leader Soekarno; leaves by train for Batavia the same day.",
         more: "With no Dutch officials present, Koperberg introduced Soekarno and two young Sundanese activists. They spoke good English and knew a great deal about Gandhi, Chittaranjan Das, Motilal Nehru and Sarojini Naidu. The poet and companions were much impressed by the charming young leader.",
         size: "large",
+        image: image("soekarno.jpg", "A young man in a light suit standing among a crowd", 166, FULL_FRAME),
         marker: "bandung",
         cluster: "bandung",
         zoom: 3.6,
@@ -608,16 +628,12 @@ export const journeyStops: JourneyStop[] = [
         summary: "Leaves Batavia for Singapore en route to Bangkok, accompanied by Surendranath Kar.",
         more: "Chatterji stays behind for a lecture assignment at the Koninklijk Bataviaasch Genootschap van Kunsten en Wetenschappen.",
         size: "large",
-        // The design repeats the Borobudur photograph here.
-        image: image("borobudur.jpg", "Visitors walking before Borobudur", 198, {
-            width: "138.78%",
-            height: "216%",
-            left: "-19.39%",
-            top: "-58%",
-        }),
-        marker: "batavia",
+        image: image("batavia-singapore.jpg", "Tagore speaking at a lectern", 166, FULL_FRAME),
+        // The card hangs from Singapore, where the day's voyage ends, so the map travels
+        // there once and settles rather than flying back to Batavia.
+        marker: "singapore",
         routes: ["batavia-singapore"],
-        also: ["singapore"],
+        also: ["batavia"],
         zoom: 1.9,
     },
     {
@@ -626,6 +642,7 @@ export const journeyStops: JourneyStop[] = [
         place: "At sea (ship Mijer)",
         summary: "Composes his famous Bali poem 'Sagarika,' paying tribute to the island and the Indonesian people.",
         size: "large",
+        image: image("sagarika.jpg", "A bust of Tagore on a stone memorial", 166, FULL_FRAME),
         marker: "atSea",
         routes: ["singapore-at-sea"],
         zoom: 1.9,
@@ -638,6 +655,7 @@ export const journeyStops: JourneyStop[] = [
             "Pays a brief visit to Siam before returning to India, completing the roughly three-and-a-half-month tour.",
         more: "The article's narrative closes with the return leg and does not record the exact date the poet reached Santiniketan. Its verdict on the visit: India and Indonesia briefly 'recognized an ancient bond and the possibility of a new partnership' - but the planned cultural-exchange programme never materialized on any significant scale.",
         size: "large",
+        image: image("siam.jpg", "Boats crowded together on a river", 198, FULL_FRAME),
         marker: "siam",
         routes: ["at-sea-siam"],
         zoom: 1.4,

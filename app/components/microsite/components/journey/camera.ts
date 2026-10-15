@@ -157,11 +157,76 @@ export const clusterLayout = (count: number): Point[] =>
         y: (index - (count - 1) / 2) * 8.5,
     }));
 
-/** Scales and moves a route's path data (an absolute M, then relative curves) onto the screen. */
-export const routeToScreen = (d: string, transform: Transform) => {
-    const [move, curves] = d.slice(1).split("c");
-    const [x, y] = move.split(",").map(Number);
-    const relative = (curves.match(/-?\d*\.?\d+/g) ?? []).map((value) => Number(value) * transform.k);
+/**
+ * The camera's course for a date with travel lines: from where it stands, along
+ * the lines, to where the card will hang, smoothed so the hand-drawn wiggles of a
+ * line never shake the map. `at(f)` is the point a fraction f of the way along it;
+ * `length` is in map units.
+ */
+export const smoothTrack = (from: Point, line: Point[], to: Point) => {
+    const resample = (points: Point[], count: number) => {
+        const lengths = [0];
+        for (let i = 1; i < points.length; i++) {
+            lengths.push(lengths[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
+        }
+        const total = lengths[lengths.length - 1];
+        const at = (distance: number): Point => {
+            let i = 1;
+            while (i < lengths.length - 1 && lengths[i] < distance) {
+                i++;
+            }
+            const span = lengths[i] - lengths[i - 1] || 1;
+            const t = clamp((distance - lengths[i - 1]) / span, 0, 1);
+            return {
+                x: points[i - 1].x + (points[i].x - points[i - 1].x) * t,
+                y: points[i - 1].y + (points[i].y - points[i - 1].y) * t,
+            };
+        };
+        return { total, at, points: Array.from({ length: count + 1 }, (_, i) => at((total * i) / count)) };
+    };
 
-    return `M${x * transform.k + transform.x},${y * transform.k + transform.y}c${relative.join(",")}`;
+    const SAMPLES = 160;
+    const raw = resample([from, ...line, to], SAMPLES);
+    if (raw.total < 1e-6) {
+        return { at: () => from, length: 0 };
+    }
+
+    // A Gaussian blur along the course, a fifth of its length wide. Past either end
+    // the course is mirrored through the end point, so the ends keep their heading.
+    const even = raw.points;
+    const sigma = SAMPLES * 0.1;
+    const reach = Math.ceil(sigma * 3);
+    const pointAt = (j: number): Point => {
+        if (j < 0) {
+            return { x: 2 * even[0].x - even[-j].x, y: 2 * even[0].y - even[-j].y };
+        }
+        if (j > SAMPLES) {
+            const m = 2 * SAMPLES - j;
+            return { x: 2 * even[SAMPLES].x - even[m].x, y: 2 * even[SAMPLES].y - even[m].y };
+        }
+        return even[j];
+    };
+    const blurred = even.map((_, i) => {
+        let x = 0;
+        let y = 0;
+        let weights = 0;
+        for (let j = i - reach; j <= i + reach; j++) {
+            const w = Math.exp(-((j - i) ** 2) / (2 * sigma * sigma));
+            const p = pointAt(Math.min(Math.max(j, -SAMPLES), 2 * SAMPLES));
+            x += p.x * w;
+            y += p.y * w;
+            weights += w;
+        }
+        return { x: x / weights, y: y / weights };
+    });
+    // Pinned to start exactly where the camera is and end exactly where the card hangs.
+    const first = { x: even[0].x - blurred[0].x, y: even[0].y - blurred[0].y };
+    const last = { x: even[SAMPLES].x - blurred[SAMPLES].x, y: even[SAMPLES].y - blurred[SAMPLES].y };
+    const pinned = blurred.map((p, i) => {
+        const u = i / SAMPLES;
+        return { x: p.x + first.x * (1 - u) + last.x * u, y: p.y + first.y * (1 - u) + last.y * u };
+    });
+
+    const track = resample(pinned, SAMPLES);
+    return { at: (f: number) => track.at(clamp(f, 0, 1) * track.total), length: track.total };
 };

@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, type MutableRefObject } from "react";
-import type { MotionValue } from "framer-motion";
-import { routeToScreen } from "./camera";
+import { frame, type MotionValue } from "framer-motion";
 import { journeyRoutes, type JourneyRouteId } from "../../data/journey";
 
 export type CameraValues = {
@@ -16,7 +15,7 @@ export type RouteGeometry = MutableRefObject<Partial<Record<JourneyRouteId, SVGP
 
 type JourneyRoutesProps = {
     camera: CameraValues;
-    /** How much of each crossing is drawn, 0 to 1. */
+    /** How much of each leg is drawn, 0 to 1. */
     progress: Record<JourneyRouteId, MotionValue<number>>;
     /** The legs whose dashes run while their date's card is open. */
     marching: JourneyRouteId[];
@@ -26,96 +25,113 @@ type JourneyRoutesProps = {
 
 const routeIds = Object.keys(journeyRoutes) as JourneyRouteId[];
 
+/** How wide the reveal runs along a line, in map units: enough to cover it at every zoom. */
+const REVEAL_WIDTH = 4;
+
 /**
  * Every leg of the journey as a dotted line, as in the designer's map: dark red
- * across the sea, white over land. Each is revealed by a mask drawn along the same
- * path, so the dashes appear from where Tagore set out to where he arrived, with a
- * small dot travelling at the head.
+ * across the sea, white over land. A leg being travelled is revealed by a mask
+ * drawn along the same path, so the dashes appear from where Tagore set out to
+ * where he arrived, with a small dot travelling at the head.
  *
- * The paths are rewritten in screen space on every camera move rather than
- * scaled with the map, which keeps the line and its dashes the same weight at
- * every zoom.
+ * The lines sit in one group that moves and scales with the map, so a camera move
+ * costs a single transform per frame. Their strokes do not scale with it, which
+ * keeps the line and its dashes the same weight at every zoom.
  */
 const JourneyRoutes = ({ camera, progress, marching, geometry }: JourneyRoutesProps) => {
     // React's ids carry colons, which a url(#...) reference does not accept.
     const maskId = `route${useId().replace(/:/g, "")}`;
+    const groupRef = useRef<SVGGElement>(null);
     const dashRefs = useRef<Partial<Record<JourneyRouteId, SVGPathElement | null>>>({});
     const maskRefs = useRef<Partial<Record<JourneyRouteId, SVGPathElement | null>>>({});
     const headRefs = useRef<Partial<Record<JourneyRouteId, SVGCircleElement | null>>>({});
 
     useEffect(() => {
+        // What each leg last showed, so a frame only touches the legs that changed.
+        const shown: Partial<Record<JourneyRouteId, "hidden" | "drawing" | "drawn">> = {};
+
         const render = () => {
-            const transform = { x: camera.x.get(), y: camera.y.get(), k: camera.k.get() };
+            const k = camera.k.get();
+            const x = camera.x.get();
+            const y = camera.y.get();
+            groupRef.current?.setAttribute("transform", `matrix(${k} 0 0 ${k} ${x} ${y})`);
 
             routeIds.forEach((id) => {
                 const dash = dashRefs.current[id];
                 const mask = maskRefs.current[id];
                 const head = headRefs.current[id];
                 const shape = geometry.current[id];
-                if (!dash || !mask || !head) {
+                if (!dash || !mask || !head || !shape) {
                     return;
                 }
-                const d = routeToScreen(journeyRoutes[id].d, transform);
                 const drawn = progress[id].get();
-                dash.setAttribute("d", d);
-                mask.setAttribute("d", d);
-                mask.style.strokeDashoffset = String(1 - drawn);
-                dash.style.opacity = drawn > 0 ? "1" : "0";
+                const state = drawn <= 0 ? "hidden" : drawn >= 1 ? "drawn" : "drawing";
 
-                if (shape && drawn > 0 && drawn < 1) {
-                    const point = shape.getPointAtLength(drawn * shape.getTotalLength());
-                    head.setAttribute("cx", String(point.x * transform.k + transform.x));
-                    head.setAttribute("cy", String(point.y * transform.k + transform.y));
-                    head.style.opacity = "1";
-                } else {
-                    head.style.opacity = "0";
+                if (state !== shown[id]) {
+                    shown[id] = state;
+                    dash.style.opacity = state === "hidden" ? "0" : "1";
+                    // Only a leg on its way needs the mask; a finished one is drawn plainly.
+                    if (state === "drawing") {
+                        dash.setAttribute("mask", `url(#${maskId}-${id})`);
+                    } else {
+                        dash.removeAttribute("mask");
+                    }
+                    head.style.opacity = state === "drawing" ? "1" : "0";
+                }
+
+                if (state === "drawing") {
+                    const length = shape.getTotalLength();
+                    mask.style.strokeDasharray = `${length} ${length}`;
+                    mask.style.strokeDashoffset = String(length * (1 - drawn));
+                    const point = shape.getPointAtLength(drawn * length);
+                    head.setAttribute("cx", String(point.x * k + x));
+                    head.setAttribute("cy", String(point.y * k + y));
                 }
             });
         };
 
+        const schedule = () => frame.render(render);
         render();
         const sources = [camera.x, camera.y, camera.k, ...routeIds.map((id) => progress[id])];
-        const unsubscribers = sources.map((value) => value.on("change", render));
+        const unsubscribers = sources.map((value) => value.on("change", schedule));
         return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
-    }, [camera, progress, geometry]);
+    }, [camera, progress, geometry, maskId]);
 
     return (
         <>
             <svg aria-hidden className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
-                <defs>
+                <g ref={groupRef}>
+                    <defs>
+                        {routeIds.map((id) => (
+                            <mask key={id} id={`${maskId}-${id}`} maskUnits="userSpaceOnUse" x={-200} y={-200} width={3500} height={2200}>
+                                <path
+                                    ref={(element) => (maskRefs.current[id] = element)}
+                                    d={journeyRoutes[id].d}
+                                    fill="none"
+                                    stroke="#fff"
+                                    strokeWidth={REVEAL_WIDTH}
+                                    strokeLinecap="round"
+                                />
+                            </mask>
+                        ))}
+                    </defs>
                     {routeIds.map((id) => (
-                        <mask key={id} id={`${maskId}-${id}`} maskUnits="userSpaceOnUse" x="0" y="0" width="100%" height="100%">
-                            <path
-                                ref={(element) => (maskRefs.current[id] = element)}
-                                fill="none"
-                                stroke="#fff"
-                                strokeWidth={8}
-                                pathLength={1}
-                                strokeDasharray="1 1"
-                                style={{ strokeDashoffset: 1 }}
-                            />
-                        </mask>
-                    ))}
-                </defs>
-                {routeIds.map((id) => (
-                    <g key={id}>
                         <path
+                            key={id}
                             ref={(element) => (dashRefs.current[id] = element)}
-                            mask={`url(#${maskId}-${id})`}
+                            d={journeyRoutes[id].d}
                             fill="none"
                             stroke={journeyRoutes[id].kind === "sea" ? "#6a1b1d" : "#ffffff"}
                             strokeWidth={1.5}
                             strokeDasharray="5 3"
+                            vectorEffect="non-scaling-stroke"
                             className={`transition-opacity duration-300 ${marching.includes(id) ? "motion-safe:animate-march" : ""}`}
                             style={{ opacity: 0 }}
                         />
-                        <circle
-                            ref={(element) => (headRefs.current[id] = element)}
-                            r={3.5}
-                            fill="#fff"
-                            style={{ opacity: 0 }}
-                        />
-                    </g>
+                    ))}
+                </g>
+                {routeIds.map((id) => (
+                    <circle key={id} ref={(element) => (headRefs.current[id] = element)} r={3.5} fill="#fff" style={{ opacity: 0 }} />
                 ))}
             </svg>
 
