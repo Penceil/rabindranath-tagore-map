@@ -5,7 +5,7 @@ import { S2S_ASSETS } from "./home";
  * date, copied from the Figma file's "Key Moment + Anecdotes" frame.
  *
  * Positions are in the map's own units, the 3088 × 1756 viewBox of the SVG the
- * designer exported ("The Journey.svg"). The places the designer marked keep the
+ * designer exported ("The Journey 2.svg"). The places the designer marked keep the
  * exact coordinates of her dots; the Bali villages, which she left as "a few
  * series of dots", are placed from their latitude and longitude with the same
  * projection her dots follow (x = 25.457 × lon − 1057.2, y = −25.617 × lat + 1072.8).
@@ -66,8 +66,8 @@ export const journeyPlaces: Record<JourneyPlaceId, JourneyPlace> = {
     borobudur: { name: "Borobudur", x: 1746.39, y: 1267.09, size: "small" },
     jogjakarta: { name: "Jogjakarta", x: 1752.74, y: 1273.78, size: "large" },
     prambanan: { name: "Prambanan", x: 1761, y: 1269.9, size: "small" },
-    surakarta: { name: "Surakarta", x: 1768.18, y: 1264.2, size: "large" },
-    surabaya: { name: "Surabaya", x: 1821.45, y: 1271.15, size: "medium" },
+    surakarta: { name: "Surakarta", x: 1766.92, y: 1263.89, size: "large" },
+    surabaya: { name: "Surabaya", x: 1814.05, y: 1260.82, size: "medium" },
     buleleng: { name: "Buleleng", x: 1874.11, y: 1280.73, size: "large" },
     denpasar: { name: "Den Pasar", x: 1875.91, y: 1293.26, size: "medium" },
     bangli: { name: "Bangli", x: 1879.39, y: 1289.37, size: "small", revealedBy: "bali-tour" },
@@ -76,17 +76,113 @@ export const journeyPlaces: Record<JourneyPlaceId, JourneyPlace> = {
     gianyar: { name: "Gianyar", x: 1878.76, y: 1291.57, size: "small", revealedBy: "bali-tour" },
     ubud: { name: "Ubud", x: 1876.97, y: 1290.72, size: "small", revealedBy: "bali-tour" },
     mundu: { name: "Mundu", x: 1872.14, y: 1284.4, size: "small", revealedBy: "bali-tour" },
-    atSea: { name: "At sea (ship Mijer)", x: 1594, y: 939.41, size: "small" },
+    atSea: { name: "At sea (ship Mijer)", x: 1572.87, y: 921.64, size: "small" },
     siam: { name: "Siam", x: 1504.15, y: 727.18, size: "medium" },
 };
 
-export type JourneyRouteId = "madras-singapore" | "penang-belawan";
+/** Every leg of the journey, in the order it was travelled. */
+export type JourneyRouteId =
+    | "calcutta-madras"
+    | "madras-singapore"
+    | "penang-belawan"
+    | "belawan-medan"
+    | "medan-sumatra"
+    | "sumatra-batavia"
+    | "batavia-buleleng"
+    | "bali-surabaya"
+    | "surabaya-surakarta"
+    | "surakarta-jogjakarta"
+    | "jogjakarta-prambanan"
+    | "jogjakarta-borobudur"
+    | "borobudur-bandung"
+    | "bandung-batavia"
+    | "batavia-singapore"
+    | "singapore-at-sea"
+    | "at-sea-siam";
 
-/** The two sea crossings the designer starred, drawn exactly as in her SVG. */
-export const journeyRoutes: Record<JourneyRouteId, string> = {
-    "madras-singapore":
-        "M993.29,742.93c10.62,10.31,27.8,24.84,51.93,36.39,25.17,12.05,45.98,15.16,81.21,20.67,41.96,6.56,87.65,13.9,99.07,15.85,46,7.85,140.07,23.91,204.47,89.56,37.96,38.69,67.36,76.87,67.36,76.87,14.04,18.23,31.96,43.21,64.19,53.1,8.96,2.75,16.79,3.65,22.19,3.96",
-    "penang-belawan": "M1489.19,909.71c9.54,12.84-10.94,37.52-36.68,65.69",
+export type JourneyRoute = {
+    /** By sea, drawn in the map's dark red; overland, drawn in white. */
+    kind: "sea" | "land";
+    /** Path data in map units: an absolute M, then relative curves. */
+    d: string;
+};
+
+/**
+ * The dotted lines joining every place, taken from the designer's SVG ("The
+ * Journey 2.svg"). Where she drew two legs as one line (Madras to Singapore and on
+ * to Siam; Buleleng to Batavia and on to Singapore) it is cut at the stop between,
+ * and lines she drew against the direction of travel are reversed, so each draws
+ * from where Tagore set out to where he arrived.
+ */
+export const journeyRoutes: Record<JourneyRouteId, JourneyRoute> = {
+    "calcutta-madras": {
+        kind: "land",
+        d: "M1193.96,495.51c-22.5,1.63,-28.66,4.82,-29.1,7.86,-0.24,1.62,1.23,3.43,0.35,6.34,-0.62,2.07,-2.22,3.86,-5.02,6.1,-5.19,4.15,-7.26,16.6,-13.49,20.23,-6.22,3.63,-40.98,38.91,-46.17,50.84,-5.19,11.93,-19.71,15.56,-21.27,17.12,-1.56,1.56,-28.53,36.83,-57.06,38.91,-28.53,2.07,-20.23,16.08,-22.82,21.27,-8.64,17.28,-17.22,24.88,-20.75,40.46,-1.72,7.61,-0.78,19,11.41,35.27",
+    },
+    "madras-singapore": {
+        kind: "sea",
+        d: "M993.29,742.93c10.62,10.31,27.8,24.84,51.93,36.39,25.17,12.05,45.98,15.16,81.21,20.67,41.96,6.56,87.65,13.9,99.07,15.85,46,7.85,140.07,23.91,204.47,89.56,37.96,38.69,67.36,76.87,67.36,76.87,14.04,18.23,31.96,43.21,64.19,53.1,8.15,2.5,15.37,3.47,20.67,3.86",
+    },
+    "penang-belawan": {
+        kind: "sea",
+        d: "M1489.19,909.71c9.54,12.84,-10.94,37.52,-36.68,65.69",
+    },
+    "belawan-medan": {
+        kind: "land",
+        d: "M1450.31,977.23c0,0,1.08,8.78,0,11.15",
+    },
+    "medan-sumatra": {
+        kind: "land",
+        d: "M1451.01,988.39c2.59,1.12,5.61,0.7,8.3,1.65,2.52,0.89,4.79,2.37,6.85,4.06,3.96,3.24,9.4,7.95,10.36,13.17,0.96,5.22,1.32,10.05,4.3,14.88,2.65,4.28,6.4,7.88,10.8,10.33,4.71,2.62,9.44,3.12,14.68,3.61,5.24,0.49,9.45,2.4,10.22,8,0.64,4.62,-1.05,9.54,0.59,14.03,1.84,5.05,7.17,5.87,11.45,7.99,9.17,4.56,8.88,18.03,18.33,21.81,-2.96,4.66,2.29,9.64,6.03,11.7,5.98,2.32,9.98,7.32,13.98,11.32,1,1,2,0,3,1,2,2,3,4,4,6,5,12,10,25,22,31,6,-1,9,6,11,11,4,7,9,14,7,22,-3,12,-0.46,27.45,10.43,35.92",
+    },
+    "sumatra-batavia": {
+        kind: "sea",
+        d: "M1624.33,1217.86c7.26,10.59,24.88,2.84,28.44,9.87",
+    },
+    "batavia-buleleng": {
+        kind: "sea",
+        d: "M1652.77,1227.73c16.13,-9.79,34.13,-11.79,52.13,-8.79,48,8,93,14,139,28,15,5,26,16,29.71,31.56",
+    },
+    "bali-surabaya": {
+        kind: "land",
+        d: "M1874.75,1290.19c-0.25,-1.18,-0.5,-2.37,-0.75,-3.55,-0.04,-0.18,-0.08,-0.36,-0.18,-0.5,-0.43,-0.6,-1.33,-0.14,-2.04,0.06,-0.85,0.24,-1.75,-0.02,-2.6,-0.27,-2.11,-0.63,-4.22,-1.27,-6.33,-1.9,-0.92,-0.28,-1.87,-0.56,-2.83,-0.48,-0.86,0.08,-1.69,0.44,-2.55,0.51,-0.86,0.07,-1.88,-0.3,-2.11,-1.14,-0.2,-0.73,0.28,-1.47,0.36,-2.22,0.13,-1.16,-0.67,-2.19,-1.42,-3.08,-0.34,-0.39,-0.67,-0.79,-1.01,-1.19,-0.79,-0.93,-1.6,-1.88,-2.65,-2.5,-1.33,-0.78,-2.92,-0.95,-4.46,-1.11,-1.3,-0.13,-2.61,-0.27,-3.91,-0.4,-0.47,-0.04,-0.96,-0.09,-1.38,0.12,-0.29,0.14,-0.52,0.38,-0.78,0.57,-1.6,1.13,-3.73,-0.32,-5.68,-0.34,-2.51,-0.02,-4.55,2.37,-7.07,2.4,-1.55,0.02,-2.95,-0.87,-4.3,-1.62,-1.75,-0.97,-3.59,-1.77,-5.5,-2.39,-2.03,-0.66,-4.51,-1.49,-4.9,-3.59,-0.39,-2.09,1.66,-3.91,1.71,-6.03",
+    },
+    "surabaya-surakarta": {
+        kind: "land",
+        d: "M1811.71,1260.03c-0.28,1.26,-1.57,2.02,-2.82,2.35,-1.25,0.33,-2.58,0.37,-3.76,0.89,-1.1,0.49,-2,1.38,-3.13,1.82,-0.66,0.25,-1.37,0.34,-2.04,0.59,-1.07,0.39,-1.94,1.16,-2.9,1.78,-0.96,0.62,-2.1,1.11,-3.21,0.84,-0.98,-0.24,-1.76,-1.04,-2.74,-1.29,-0.76,-0.2,-1.56,-0.05,-2.35,-0.09,-1.56,-0.09,-3.11,-0.95,-4.61,-0.5,-0.56,0.17,-1.08,0.52,-1.66,0.52,-0.91,0,-1.58,-0.86,-1.98,-1.68,-0.4,-0.82,-0.74,-1.76,-1.52,-2.23,-0.61,-0.37,-1.36,-0.38,-2.07,-0.36,-1.92,0.05,-3.84,0.22,-5.74,0.5,-0.55,0.08,-1.13,0.18,-1.54,0.56,-0.32,0.3,-0.49,0.71,-0.74,1.06,-0.9,1.27,-2.96,1.49,-4.1,0.43",
+    },
+    "surakarta-jogjakarta": {
+        kind: "land",
+        d: "M1765.74,1263.89c-3.71,0,-10.04,0.82,-12.52,5.16,-0.45,0.8,-1.37,2.6,-1.21,4.73",
+    },
+    "jogjakarta-prambanan": {
+        kind: "land",
+        d: "M1753.45,1274.71c0,0,5.96,0.29,7.55,-4.8",
+    },
+    "jogjakarta-borobudur": {
+        kind: "land",
+        d: "M1751.71,1273.03c-0.49,-0.72,-0.87,-1.52,-1.11,-2.35,-0.14,-0.49,-0.24,-1,-0.52,-1.42,-0.27,-0.42,-0.7,-0.71,-1.13,-0.97,-0.69,-0.42,-1.42,-0.79,-2.17,-1.1",
+    },
+    "borobudur-bandung": {
+        kind: "land",
+        d: "M1741.66,1263.46c-0.44,-0.34,-0.91,-0.69,-1.45,-0.81,-0.54,-0.12,-1.2,0.04,-1.47,0.53,-0.21,0.38,-0.15,0.87,-0.39,1.23,-0.51,0.78,-1.88,0.43,-2.44,1.17,-0.1,0.12,-0.16,0.28,-0.27,0.39,-0.15,0.15,-0.35,0.22,-0.55,0.28,-1.69,0.5,-3.57,0.35,-5.16,-0.42,-1.47,-0.71,-2.71,-1.91,-4.3,-2.29,-1.2,-0.28,-2.49,-0.05,-3.67,-0.4,-1.3,-0.38,-2.34,-1.41,-3.64,-1.8,-0.73,-0.22,-1.5,-0.23,-2.24,-0.39,-1.2,-0.26,-2.3,-0.97,-3.05,-1.94,-0.4,-0.52,-0.7,-1.12,-1.13,-1.63,-0.43,-0.51,-1.03,-0.93,-1.69,-0.92,-1.15,0.02,-1.89,1.25,-2.95,1.69,-0.71,0.29,-1.52,0.2,-2.28,0.1,-2.1,-0.28,-4.19,-0.65,-6.26,-1.09,-0.18,-0.04,-0.38,-0.09,-0.52,-0.22,-0.06,-0.05,-0.11,-0.12,-0.15,-0.18,-0.51,-0.74,-1.07,-1.53,-1.93,-1.8,-0.49,-0.15,-1.02,-0.11,-1.53,-0.17,-2.05,-0.24,-3.7,-2.02,-5.76,-2.12,-0.48,-0.03,-0.97,0.05,-1.43,-0.09,-0.46,-0.14,-0.9,-0.56,-0.82,-1.03",
+    },
+    "bandung-batavia": {
+        kind: "land",
+        d: "M1682.32,1250.77c-1.58,-0.09,-3.19,-0.22,-4.64,-0.82,-1.45,-0.6,-2.77,-1.75,-3.19,-3.27,-0.28,-1,-0.18,-2.16,-0.79,-3,-0.18,-0.26,-0.42,-0.47,-0.59,-0.74,-0.29,-0.5,-0.3,-1.11,-0.29,-1.69,0.03,-1.38,0.13,-2.78,-0.15,-4.13,-0.28,-1.35,-1,-2.69,-2.22,-3.34,-1.69,-0.91,-3.82,-0.3,-5.64,-0.93,-0.96,-0.33,-1.77,-0.99,-2.71,-1.39,-1.18,-0.5,-2.49,-0.56,-3.75,-0.86,-1.26,-0.3,-2.55,-0.92,-3.07,-2.1",
+    },
+    "batavia-singapore": {
+        kind: "sea",
+        d: "M1652.77,1227.73c2.2,-4.5,32.23,-67.64,8.6,-106.44,0,0,-11.46,-18.82,-44.15,-45.53,-5.21,-4.26,-10.56,-7.58,-10.56,-7.58,-4.48,-2.78,-7.66,-4.25,-9.01,-4.97,-4.81,-2.57,-10.85,-8.69,-15.44,-24.74",
+    },
+    "singapore-at-sea": {
+        kind: "sea",
+        d: "M1582.19,1039.23c0.52,0.04,1.03,0.07,1.52,0.1,-0.19,0.79,-0.53,2.69,0.46,4.39,1.4,2.38,3.82,2.92,6.01,2.85,5.19,-0.16,9.94,-2.08,11.55,-3.58,6.68,-6.2,-9.58,-24.46,-15.98,-54.61,-3.73,-17.57,0.14,-18.78,-3.56,-37.41,-2.24,-11.28,-5.66,-20.88,-9.5,-29.37",
+    },
+    "at-sea-siam": {
+        kind: "sea",
+        d: "M1572.69,921.6c-2.84,-6.28,-5.91,-11.95,-8.92,-17.26,-34.09,-60.15,-57.21,-68.77,-66.64,-102.13,-4.59,-16.23,-6.63,-40.73,7.01,-75.05",
+    },
 };
 
 /** A photograph beside a card, cropped as in Figma: the picture's box relative to its frame. */
@@ -117,8 +213,8 @@ export type JourneyStop = {
     cluster?: JourneyPlaceId;
     /** Other places lit with this stop. */
     also?: JourneyPlaceId[];
-    /** A starred crossing: the dashed line drawn as the map follows it. */
-    route?: JourneyRouteId;
+    /** The legs that bring the journey here, drawn one after another as the map follows them. */
+    routes?: JourneyRouteId[];
     /** An inland tour: its places appear one after another, without a line. */
     series?: JourneyPlaceId[];
     /** How far the map zooms in, against the overview of the first stop. */
@@ -159,8 +255,8 @@ export const journeyStops: JourneyStop[] = [
             top: "-10.34%",
         }),
         marker: "singapore",
+        routes: ["calcutta-madras", "madras-singapore"],
         also: ["madras"],
-        route: "madras-singapore",
         zoom: 1.35,
     },
     {
@@ -189,8 +285,8 @@ export const journeyStops: JourneyStop[] = [
         size: "large",
         // The crossing ends at Belawan; Medan, a few hours inland, is the day's last stop.
         marker: "medan",
+        routes: ["penang-belawan", "belawan-medan"],
         also: ["penang", "belawan"],
-        route: "penang-belawan",
         zoom: 2.6,
     },
     {
@@ -201,6 +297,7 @@ export const journeyStops: JourneyStop[] = [
         more: "Welcomed by Mr and Mrs Bake, Dr F.D.K. Bosch and Dr Hoesein Djajadiningrat. The Kunstkring hosts a reception; a dinner given by British Consul Mr Crosby lets the party meet local intellectuals and Indian & Chinese businessmen.",
         size: "small",
         marker: "batavia",
+        routes: ["medan-sumatra", "sumatra-batavia"],
         cluster: "batavia",
         zoom: 3.2,
     },
@@ -219,6 +316,7 @@ export const journeyStops: JourneyStop[] = [
             top: "-14.3%",
         }),
         marker: "buleleng",
+        routes: ["batavia-buleleng"],
         zoom: 3.4,
     },
     {
@@ -255,6 +353,7 @@ export const journeyStops: JourneyStop[] = [
             top: "-42%",
         }),
         marker: "surabaya",
+        routes: ["bali-surabaya"],
         cluster: "surabaya",
         zoom: 3.6,
     },
@@ -296,6 +395,7 @@ export const journeyStops: JourneyStop[] = [
             top: "0%",
         }),
         marker: "surakarta",
+        routes: ["surabaya-surakarta"],
         cluster: "surakarta",
         zoom: 4.5,
     },
@@ -358,6 +458,7 @@ export const journeyStops: JourneyStop[] = [
             top: "-29.69%",
         }),
         marker: "surakarta",
+        routes: ["surakarta-jogjakarta"],
         cluster: "surakarta",
         also: ["jogjakarta"],
         zoom: 4.5,
@@ -382,6 +483,7 @@ export const journeyStops: JourneyStop[] = [
         more: "Meet Mr Van Haan, engineer in charge of the Prambanan restoration. The party was delighted that Prambanan's Ramayana reliefs had no Indian temple parallel, and intrigued that the Javanese reliefs diverged from the Bhagavata text and showed Puranic tales unknown in India. They witnessed the 'miracle' of cross-cultural temple reconstruction, credited to the Netherlands East Indies government.",
         size: "large",
         marker: "prambanan",
+        routes: ["jogjakarta-prambanan"],
         zoom: 4.5,
     },
     {
@@ -433,6 +535,7 @@ export const journeyStops: JourneyStop[] = [
             top: "-58%",
         }),
         marker: "borobudur",
+        routes: ["jogjakarta-borobudur"],
         zoom: 4.5,
     },
     {
@@ -454,6 +557,7 @@ export const journeyStops: JourneyStop[] = [
         more: "A much-longed-for respite from the hot Javanese and Balinese summer.",
         size: "large",
         marker: "bandung",
+        routes: ["borobudur-bandung"],
         cluster: "bandung",
         zoom: 3.6,
     },
@@ -493,6 +597,7 @@ export const journeyStops: JourneyStop[] = [
             top: "-38.5%",
         }),
         marker: "batavia",
+        routes: ["bandung-batavia"],
         cluster: "batavia",
         zoom: 3.2,
     },
@@ -511,6 +616,7 @@ export const journeyStops: JourneyStop[] = [
             top: "-58%",
         }),
         marker: "batavia",
+        routes: ["batavia-singapore"],
         also: ["singapore"],
         zoom: 1.9,
     },
@@ -521,6 +627,7 @@ export const journeyStops: JourneyStop[] = [
         summary: "Composes his famous Bali poem 'Sagarika,' paying tribute to the island and the Indonesian people.",
         size: "large",
         marker: "atSea",
+        routes: ["singapore-at-sea"],
         zoom: 1.9,
     },
     {
@@ -532,6 +639,7 @@ export const journeyStops: JourneyStop[] = [
         more: "The article's narrative closes with the return leg and does not record the exact date the poet reached Santiniketan. Its verdict on the visit: India and Indonesia briefly 'recognized an ancient bond and the possibility of a new partnership' - but the planned cultural-exchange programme never materialized on any significant scale.",
         size: "large",
         marker: "siam",
+        routes: ["at-sea-siam"],
         zoom: 1.4,
     },
 ];

@@ -6,6 +6,7 @@ import {
     AnimatePresence,
     animate,
     motion,
+    motionValue,
     useMotionValue,
     useReducedMotion,
     type AnimationPlaybackControls,
@@ -154,7 +155,7 @@ const focusOf = (index: number): Point => {
     return { x: place.x, y: place.y };
 };
 
-const routeStopIndex = (route: JourneyRouteId) => journeyStops.findIndex((stop) => stop.route === route);
+const routeStopIndex = (route: JourneyRouteId) => journeyStops.findIndex((stop) => stop.routes?.includes(route));
 
 /** Where on screen the stop's dot should sit so its card, photograph included, fits beside it. */
 const anchorFor = (index: number, viewport: Size, desktop: boolean): Point => {
@@ -293,12 +294,10 @@ const JourneyExperience = () => {
     const viewportRef = useRef<Size>({ width: 1, height: 1 });
     const timers = useRef<Timers>({ cancelled: false, controls: [] });
 
-    // How much of each crossing is drawn, 0 to 1.
-    const madrasSingapore = useMotionValue(0);
-    const penangBelawan = useMotionValue(0);
-    const progress = useMemo<Record<JourneyRouteId, MotionValue<number>>>(
-        () => ({ "madras-singapore": madrasSingapore, "penang-belawan": penangBelawan }),
-        [madrasSingapore, penangBelawan]
+    // How much of each leg is drawn, 0 to 1.
+    const progress = useMemo(
+        () => Object.fromEntries(routeIds.map((id) => [id, motionValue(0)])) as Record<JourneyRouteId, MotionValue<number>>,
+        []
     );
 
     // The open card hangs the same distance from its dot on every stop, as in the
@@ -496,7 +495,9 @@ const JourneyExperience = () => {
                 const length = shape?.getTotalLength() ?? 0;
                 run.controls.push(
                     animate(0, 1, {
-                        duration: Math.min(Math.max(length / 260, 1.3), 2.8),
+                        // By its length on screen at this stop's zoom: a short walk across
+                        // Jogjakarta under a second, a long voyage nearly three.
+                        duration: Math.min(Math.max((length * baseScale(viewportRef.current) * stop.zoom) / 300, 0.9), 2.8),
                         ease: EASE_VOYAGE,
                         onUpdate: (drawn) => {
                             progress[route].set(drawn);
@@ -543,15 +544,17 @@ const JourneyExperience = () => {
                 arrive();
                 return;
             }
-            if (stop.route && forward) {
-                const shape = geometry.current[stop.route];
-                const start = shape?.getPointAtLength(0);
+            if (stop.routes && forward) {
+                // Fly to where the first leg sets out, then follow each leg in turn.
+                const start = geometry.current[stop.routes[0]]?.getPointAtLength(0);
                 if (start) {
                     await fly({ focus: { x: start.x, y: start.y }, zoom: stop.zoom }, targetAnchor);
-                    if (run.cancelled) {
-                        return;
+                    for (const leg of stop.routes) {
+                        if (run.cancelled) {
+                            return;
+                        }
+                        await sail(leg);
                     }
-                    await sail(stop.route);
                     if (run.cancelled) {
                         return;
                     }
@@ -707,7 +710,7 @@ const JourneyExperience = () => {
                         <JourneyRoutes
                             camera={camera}
                             progress={progress}
-                            marching={showCard ? stop.route : undefined}
+                            marching={showCard ? stop.routes ?? [] : []}
                             geometry={geometry}
                         />
 

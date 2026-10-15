@@ -16,3 +16,6 @@ node_modules/
 # OS files
 .DS_Store
 Thumbs.db
+
+# The designer's source map files (72 MB); the site uses the compressed copies in public/
+/assets/

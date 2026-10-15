@@ -18,8 +18,8 @@ type JourneyRoutesProps = {
     camera: CameraValues;
     /** How much of each crossing is drawn, 0 to 1. */
     progress: Record<JourneyRouteId, MotionValue<number>>;
-    /** The crossing whose dashes run while its card is open. */
-    marching?: JourneyRouteId;
+    /** The legs whose dashes run while their date's card is open. */
+    marching: JourneyRouteId[];
     /** Untransformed copies of the paths, for measuring points along them in map units. */
     geometry: RouteGeometry;
 };
@@ -27,9 +27,10 @@ type JourneyRoutesProps = {
 const routeIds = Object.keys(journeyRoutes) as JourneyRouteId[];
 
 /**
- * The starred sea crossings as dashed lines, in the designer's dark red. Each is
- * revealed by a mask drawn along the same path, so the dashes appear from the
- * start of the voyage to its end, with a small dot travelling at the head.
+ * Every leg of the journey as a dotted line, as in the designer's map: dark red
+ * across the sea, white over land. Each is revealed by a mask drawn along the same
+ * path, so the dashes appear from where Tagore set out to where he arrived, with a
+ * small dot travelling at the head.
  *
  * The paths are rewritten in screen space on every camera move rather than
  * scaled with the map, which keeps the line and its dashes the same weight at
@@ -54,7 +55,7 @@ const JourneyRoutes = ({ camera, progress, marching, geometry }: JourneyRoutesPr
                 if (!dash || !mask || !head) {
                     return;
                 }
-                const d = routeToScreen(journeyRoutes[id], transform);
+                const d = routeToScreen(journeyRoutes[id].d, transform);
                 const drawn = progress[id].get();
                 dash.setAttribute("d", d);
                 mask.setAttribute("d", d);
@@ -102,10 +103,10 @@ const JourneyRoutes = ({ camera, progress, marching, geometry }: JourneyRoutesPr
                             ref={(element) => (dashRefs.current[id] = element)}
                             mask={`url(#${maskId}-${id})`}
                             fill="none"
-                            stroke="#6a1b1d"
+                            stroke={journeyRoutes[id].kind === "sea" ? "#6a1b1d" : "#ffffff"}
                             strokeWidth={1.5}
                             strokeDasharray="5 3"
-                            className={`transition-opacity duration-300 ${marching === id ? "motion-safe:animate-march" : ""}`}
+                            className={`transition-opacity duration-300 ${marching.includes(id) ? "motion-safe:animate-march" : ""}`}
                             style={{ opacity: 0 }}
                         />
                         <circle
@@ -121,7 +122,7 @@ const JourneyRoutes = ({ camera, progress, marching, geometry }: JourneyRoutesPr
             {/* Measuring copies, in map units, never shown. */}
             <svg aria-hidden className="absolute h-0 w-0 overflow-hidden">
                 {routeIds.map((id) => (
-                    <path key={id} ref={(element) => (geometry.current[id] = element)} d={journeyRoutes[id]} />
+                    <path key={id} ref={(element) => (geometry.current[id] = element)} d={journeyRoutes[id].d} />
                 ))}
             </svg>
         </>
