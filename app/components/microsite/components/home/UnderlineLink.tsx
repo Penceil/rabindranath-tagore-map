@@ -9,6 +9,8 @@ type UnderlineLinkProps = {
   className?: string;
   /** `compact` hugs its label ("back to top"); the default is the 132px call to action. */
   variant?: "default" | "compact";
+  /** `light` is the white version set over the journey map, a size larger. */
+  tone?: "maroon" | "light";
   onClick?: MouseEventHandler<HTMLAnchorElement>;
 };
 
@@ -26,8 +28,9 @@ export const stitchMask =
   + "motion-safe:group-hover:animate-stitch motion-safe:group-focus-visible:animate-stitch";
 
 /** The maroon lowercase link with a hand-drawn underline, used for every call to action. */
-const UnderlineLink = ({ href, children, className = "", variant = "default", onClick }: UnderlineLinkProps) => {
+const UnderlineLink = ({ href, children, className = "", variant = "default", tone = "maroon", onClick }: UnderlineLinkProps) => {
   const compact = variant === "compact";
+  const light = tone === "light";
 
   return (
     <Link
@@ -36,7 +39,9 @@ const UnderlineLink = ({ href, children, className = "", variant = "default", on
       className={`group relative inline-block shrink-0 focus:outline-none ${compact ? "pb-[6px]" : "h-[27px] w-[132px]"} ${className}`}
     >
       <span
-        className={`block whitespace-nowrap text-[15px] font-medium lowercase leading-[15px] text-s2s-maroon ${activeLabel} ${
+        className={`block whitespace-nowrap font-medium lowercase leading-[15px] ${
+          light ? "text-[16px] text-white/95" : "text-[15px] text-s2s-maroon"
+        } ${activeLabel} ${
           compact ? "" : "pl-[8px]"
         }`}
       >
@@ -50,7 +55,7 @@ const UnderlineLink = ({ href, children, className = "", variant = "default", on
           compact ? "bottom-0 left-0 w-full" : "left-[3.3px] top-[19.5px] w-[calc(100%-3.3px)]"
         }`}
       >
-        <Image src={`${S2S_ASSETS}/link-underline.svg`} alt="" fill unoptimized />
+        <Image src={`${S2S_ASSETS}/${light ? "link-underline-light.svg" : "link-underline.svg"}`} alt="" fill unoptimized />
       </span>
     </Link>
   );

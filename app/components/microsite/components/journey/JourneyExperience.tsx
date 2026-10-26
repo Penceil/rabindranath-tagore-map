@@ -17,6 +17,8 @@ import { useDerived } from "./useDerived";
 import JourneyCard, { CARD_WIDTH, IMAGE_OVERLAP, MORE_WIDTH, cardVariants } from "./JourneyCard";
 import JourneyRoutes, { type CameraValues } from "./JourneyRoutes";
 import { JourneyTimelineDesktop, JourneyTimelineMobile } from "./JourneyTimeline";
+import UnderlineLink from "../home/UnderlineLink";
+import { micrositeNavigation } from "../../data/navigation";
 import {
     MAP,
     MAP_DETAIL,
@@ -55,6 +57,9 @@ const EASE_FLIGHT: BezierDefinition = [0.42, 0, 0.58, 1];
 
 const routeIds = Object.keys(journeyRoutes) as JourneyRouteId[];
 const placeIds = Object.keys(journeyPlaces) as JourneyPlaceId[];
+
+/** Where "visit the exhibition" goes. In a preview without that page it is shown but stays put. */
+const exhibitionHref = micrositeNavigation.find((item) => item.label === "exhibition")?.href ?? "";
 
 type MapDotData = {
     key: string;
@@ -202,8 +207,9 @@ const routeStopIndex = (route: JourneyRouteId) => journeyStops.findIndex((stop) 
 /** Where on screen the stop's dot should sit so its card, photograph included, fits beside it. */
 const anchorFor = (index: number, viewport: Size, desktop: boolean): Point => {
     if (!desktop) {
-        // Between the strip of dates and the card sheet over the lower half.
-        return { x: viewport.width / 2, y: Math.max(200, (172 + viewport.height * 0.54) / 2) };
+        // Between the strip of dates (its foot 182px down) and the top of the card,
+        // which stands about 335px clear of the bottom, above the call to action.
+        return { x: viewport.width / 2, y: Math.max(200, (182 + viewport.height - 335) / 2) };
     }
     const stop = journeyStops[index];
     // The card hangs from the date's own dot, which can sit a little east of the place.
@@ -493,12 +499,20 @@ const JourneyExperience = () => {
         const target: View = { focus: focusOf(active), zoom: stop.zoom };
         const targetAnchor = anchorFor(active, viewportRef.current, viewportRef.current.width >= DESKTOP_MIN);
 
+        // Going back over dates that retrace, the lines drawn since this one (all of
+        // them, or as far as their head had got) are traced back as the map returns.
+        const drawnAhead = stops
+            .flatMap((candidate, index) => (index > active ? candidate.routes ?? [] : []))
+            .filter((id) => progress[id].get() > 0);
+        const retrace =
+            !instant && !forward && drawnAhead.length > 0 && drawnAhead.every((id) => stops[routeStopIndex(id)].retrace);
+
         // Crossings already sailed stay drawn; those ahead are taken back off the map.
         routeIds.forEach((id) => {
             const at = routeStopIndex(id);
             if (at < active || (at === active && !(forward && !instant))) {
                 progress[id].set(1);
-            } else if (at > active && progress[id].get() > 0) {
+            } else if (at > active && progress[id].get() > 0 && !retrace) {
                 run.controls.push(animate(progress[id], 0, { duration: instant ? 0 : 0.4 }));
             }
         });
@@ -528,22 +542,33 @@ const JourneyExperience = () => {
         // A date with travel lines is one continuous glide: the camera eases along the
         // lines (smoothed, so their wiggles never shake it) from where it stands to
         // the place, while the lines draw in step, one leg running into the next.
-        const travel = (legs: JourneyRouteId[], to: View, anchor: Point) =>
+        // Going `back`, the glide runs the other way from the head of the drawn line,
+        // and the lines undraw in step behind it.
+        const travel = (legs: JourneyRouteId[], to: View, anchor: Point, back = false) =>
             new Promise<void>((resolve) => {
                 const shapes = legs.map((leg) => geometry.current[leg]);
                 const lengths = shapes.map((shape) => shape?.getTotalLength() ?? 0);
                 const total = lengths.reduce((sum, length) => sum + length, 0);
-                const line: Point[] = [];
+                const start = back ? legs.reduce((sum, leg, i) => sum + progress[leg].get() * lengths[i], 0) : 0;
+                const end = back ? 0 : total;
+                const line: (Point & { along: number })[] = [];
+                let before = 0;
                 shapes.forEach((shape, i) => {
                     const steps = Math.max(8, Math.ceil(lengths[i] / 4));
                     for (let step = 0; shape && step <= steps; step++) {
-                        const point = shape.getPointAtLength((lengths[i] * step) / steps);
-                        line.push({ x: point.x, y: point.y });
+                        const along = (lengths[i] * step) / steps;
+                        const point = shape.getPointAtLength(along);
+                        line.push({ x: point.x, y: point.y, along: before + along });
                     }
+                    before += lengths[i];
                 });
 
                 const from = viewRef.current;
-                const track = smoothTrack(from.focus, line, to.focus);
+                const track = smoothTrack(
+                    from.focus,
+                    back ? line.filter((point) => point.along <= start).reverse() : line,
+                    to.focus
+                );
                 const viewport = viewportRef.current;
                 // How far the glide runs on screen sets its length, and how far the camera
                 // eases back mid-way to show the lines around it.
@@ -557,7 +582,7 @@ const JourneyExperience = () => {
                         duration: Math.min(Math.max(1.2 + onScreen / 650 + Math.max(onScreen - 700, 0) / 150, 1.3), 5),
                         ease: EASE_FLIGHT,
                         onUpdate: (t) => {
-                            let left = t * total;
+                            let left = start + (end - start) * t;
                             legs.forEach((leg, i) => {
                                 progress[leg].set(lengths[i] ? Math.min(Math.max(left / lengths[i], 0), 1) : 1);
                                 left -= lengths[i];
@@ -606,7 +631,9 @@ const JourneyExperience = () => {
                 arrive();
                 return;
             }
-            if (stop.routes && forward) {
+            if (retrace) {
+                await travel(drawnAhead, target, targetAnchor, true);
+            } else if (stop.routes && forward) {
                 await travel(stop.routes, target, targetAnchor);
             } else {
                 await fly(target, targetAnchor);
@@ -781,14 +808,14 @@ const JourneyExperience = () => {
                 )}
 
                 {/* Title, in white over the map as in the design. */}
-                <header className="pointer-events-none absolute left-4 top-[18px] [text-shadow:0_1px_14px_rgba(74,10,15,0.5)] lg:left-[60px] lg:top-[60px]">
-                    <p className="text-[12px] uppercase leading-[18px] tracking-[1.44px] text-white lg:text-[16px] lg:leading-[24px] lg:tracking-[1.92px]">
+                <header className="pointer-events-none absolute left-[17px] top-[26px] [text-shadow:0_0_2px_rgba(0,0,0,0.5)] lg:left-[60px] lg:top-[60px] lg:[text-shadow:0_1px_14px_rgba(74,10,15,0.5)]">
+                    <p className="text-[13px] uppercase leading-[24px] tracking-[1.56px] text-white lg:text-[16px] lg:leading-[24px] lg:tracking-[1.92px]">
                         Rabindranath Tagore&apos;s 1927 Journey to
                     </p>
-                    <h1 className="font-Bodoni text-[32px] font-normal leading-[44px] tracking-[-1px] text-white lg:-mt-[6px] lg:text-[45px] lg:leading-[58px] lg:tracking-[-1.35px]">
+                    <h1 className="font-Bodoni text-[36px] font-normal leading-[42px] tracking-[-1.08px] text-white lg:-mt-[6px] lg:text-[45px] lg:leading-[58px] lg:tracking-[-1.35px]">
                         <span className="italic">Java and</span> Bali
                     </h1>
-                    <p className="text-[12px] uppercase leading-[18px] tracking-[1.44px] text-white lg:text-[16px] lg:leading-[19px] lg:tracking-[1.92px]">
+                    <p className="text-[13px] uppercase leading-[24px] tracking-[1.56px] text-white lg:text-[16px] lg:leading-[19px] lg:tracking-[1.92px]">
                         And the Way Home
                     </p>
                 </header>
@@ -799,6 +826,20 @@ const JourneyExperience = () => {
                     ) : (
                         <JourneyTimelineMobile stops={stops} active={active} onSelect={goTo} />
                     ))}
+
+                {/* The way on to the exhibition, along the foot of the map over a band of gold fading up into it. */}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[145px] bg-gradient-to-t from-[rgba(205,140,63,0.6)] from-[42.788%] to-[rgba(205,140,63,0)] to-[93.269%]">
+                    <div className="pointer-events-auto absolute left-[34px] top-[48px] flex flex-col items-start gap-[10px] lg:left-[60px] lg:gap-[11px]">
+                        <p className="text-[16px] font-medium leading-[28px] text-s2s-wine">Unfold more of the journey</p>
+                        <UnderlineLink
+                            href={exhibitionHref || "#"}
+                            tone="light"
+                            onClick={exhibitionHref ? undefined : (event) => event.preventDefault()}
+                        >
+                            visit the exhibition
+                        </UnderlineLink>
+                    </div>
+                </div>
 
                 {/* The card, beside its dot on desktop and as a sheet along the bottom on phones. */}
                 {viewport && desktop && (
@@ -827,7 +868,7 @@ const JourneyExperience = () => {
                 )}
 
                 {viewport && !desktop && (
-                    <div className="absolute inset-x-4 bottom-4 max-h-[46%] overflow-y-auto" aria-live="polite">
+                    <div className="absolute inset-x-4 bottom-[119px]" aria-live="polite">
                         <AnimatePresence mode="wait">
                             {showCard && (
                                 <motion.div

@@ -269,6 +269,11 @@ export type JourneyStop = {
     also?: JourneyPlaceId[];
     /** The legs that bring the journey here, drawn one after another as the map follows them. */
     routes?: JourneyRouteId[];
+    /**
+     * Going back from this date traces its legs back: the line undraws behind the
+     * map as it glides back along it, rather than being taken off at once.
+     */
+    retrace?: boolean;
     /** An inland tour: its places appear one after another, without a line. */
     series?: JourneyPlaceId[];
     /** How far the map zooms in, against the overview of the first stop. */
@@ -316,6 +321,8 @@ export const journeyStops: JourneyStop[] = [
         }),
         marker: "singapore",
         routes: ["calcutta-madras", "madras-singapore"],
+        // Only the first two crossings trace back for now, until the client confirms the rest.
+        retrace: true,
         also: ["madras"],
         zoom: 1.35,
     },
@@ -334,6 +341,7 @@ export const journeyStops: JourneyStop[] = [
         }),
         marker: "malaya",
         routes: ["singapore-malaya"],
+        retrace: true,
         also: ["singapore"],
         zoom: 1.8,
     },

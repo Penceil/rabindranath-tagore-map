@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, type CSSProperties } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion, type BezierDefinition, type Variants } from "framer-motion";
 import { MinusIcon, PlusIcon } from "../icons";
@@ -68,12 +68,24 @@ const moreTextVariants: Variants = {
     },
 };
 
-const CardImage = ({ image, left }: { image: JourneyImage; left: number }) => (
-    <motion.div
-        variants={photoVariants}
-        className={`absolute overflow-hidden bg-[#e6e1de] max-lg:hidden ${shadow}`}
-        style={{ left, top: -IMAGE_OVERLAP.y, width: image.width, height: 180 }}
-    >
+/**
+ * On phones the photograph is drawn smaller, 150px tall rather than 180, over the
+ * card's top 18px and out to the edge of the screen (the card stands 16px in).
+ */
+const PHONE_PHOTO = { height: 150, overlap: 18, right: -16 };
+
+const photoBox = (image: JourneyImage, cardWidth: number, phone: boolean): CSSProperties =>
+    phone
+        ? {
+              right: PHONE_PHOTO.right,
+              top: PHONE_PHOTO.overlap - PHONE_PHOTO.height,
+              width: Math.round((image.width * PHONE_PHOTO.height) / 180),
+              height: PHONE_PHOTO.height,
+          }
+        : { left: cardWidth - IMAGE_OVERLAP.x, top: -IMAGE_OVERLAP.y, width: image.width, height: 180 };
+
+const CardImage = ({ image, box }: { image: JourneyImage; box: CSSProperties }) => (
+    <motion.div variants={photoVariants} className={`absolute overflow-hidden bg-[#e6e1de] ${shadow}`} style={box}>
         {/* The crop box keeps the picture's own proportions, so covering it reproduces the Figma crop. */}
         <div
             className="absolute"
@@ -118,12 +130,14 @@ const JourneyCard = ({ stop, open, onToggle, moreWidth, fixedWidth }: JourneyCar
             <motion.article
                 variants={panelVariants}
                 style={{ originX: 0 }}
-                className={`bg-white/95 py-[30px] pl-[30px] pr-[60px] max-lg:p-5 ${shadow}`}
+                className={`bg-white/95 py-[30px] pl-[30px] pr-[60px] max-lg:p-[18px] ${shadow}`}
             >
-                <motion.div variants={textVariants} className="flex flex-col gap-[5px]">
+                <motion.div variants={textVariants} className="flex flex-col gap-[5px] max-lg:gap-[2px]">
                     <h2 className="font-Bodoni text-[21px] font-normal italic leading-[36px] text-s2s-wine">{stop.date}</h2>
-                    <p className="text-[15px] uppercase leading-[18px] tracking-[1.8px] text-s2s-gray opacity-70">{stop.place}</p>
-                    <p className="text-[16px] leading-[26px] text-s2s-ink">{stop.summary}</p>
+                    <p className="text-[15px] uppercase leading-[18px] tracking-[1.8px] text-s2s-gray opacity-70 max-lg:text-[14px] max-lg:leading-normal max-lg:tracking-[1.68px]">
+                        {stop.place}
+                    </p>
+                    <p className="text-[16px] leading-[26px] text-s2s-ink max-lg:leading-[24px]">{stop.summary}</p>
                     {stop.more && (
                         <button
                             type="button"
@@ -139,7 +153,12 @@ const JourneyCard = ({ stop, open, onToggle, moreWidth, fixedWidth }: JourneyCar
                 </motion.div>
             </motion.article>
 
-            {stop.image && <CardImage image={stop.image} left={width - IMAGE_OVERLAP.x} />}
+            {/* On phones the open read-more card lifts this one up to the dates, so the photograph steps aside. */}
+            {stop.image && (
+                <div className={`transition-opacity duration-300 ${open && !fixedWidth ? "pointer-events-none opacity-0" : ""}`}>
+                    <CardImage image={stop.image} box={photoBox(stop.image, width, !fixedWidth)} />
+                </div>
+            )}
 
             <AnimatePresence initial={false}>
                 {open && stop.more && (
@@ -150,7 +169,7 @@ const JourneyCard = ({ stop, open, onToggle, moreWidth, fixedWidth }: JourneyCar
                         initial="hidden"
                         animate="shown"
                         exit="hidden"
-                        className={`bg-white/95 p-[30px] text-[16px] leading-[28px] text-s2s-ink max-lg:p-5 ${shadow}`}
+                        className={`bg-white/95 p-[30px] text-[16px] leading-[28px] text-s2s-ink max-lg:max-h-[30svh] max-lg:overflow-y-auto max-lg:p-5 ${shadow}`}
                         style={{ originX: 0, marginTop: MORE_GAP, width: fixedWidth ? moreWidth : undefined }}
                     >
                         <motion.p variants={moreTextVariants}>{stop.more}</motion.p>
