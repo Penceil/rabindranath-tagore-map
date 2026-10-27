@@ -69,25 +69,30 @@ const JourneyRoutes = ({ camera, progress, marching, geometry, paths }: JourneyR
                 const drawn = progress[id].get();
                 const state = drawn <= 0 ? "hidden" : drawn >= 1 ? "drawn" : "drawing";
 
-                if (state !== shown[id]) {
+                const changed = state !== shown[id];
+                if (changed) {
                     shown[id] = state;
                     dash.style.opacity = state === "hidden" ? "0" : "1";
-                    // Only a leg on its way needs the mask; a finished one is drawn plainly.
-                    if (state === "drawing") {
-                        dash.setAttribute("mask", `url(#${maskId}-${id})`);
-                    } else {
+                    // Only a finished leg is drawn plainly. One taken off keeps its mask,
+                    // emptied, so it fades out unseen rather than showing whole again.
+                    if (state === "drawn") {
                         dash.removeAttribute("mask");
+                    } else {
+                        dash.setAttribute("mask", `url(#${maskId}-${id})`);
                     }
                     head.style.opacity = state === "drawing" ? "1" : "0";
                 }
 
-                if (state === "drawing") {
+                if (state === "drawing" || (state === "hidden" && changed)) {
                     const length = shape.getTotalLength();
+                    const along = state === "drawing" ? drawn : 0;
                     mask.style.strokeDasharray = `${length} ${length}`;
-                    mask.style.strokeDashoffset = String(length * (1 - drawn));
-                    const point = shape.getPointAtLength(drawn * length);
-                    head.setAttribute("cx", String(point.x * k + x));
-                    head.setAttribute("cy", String(point.y * k + y));
+                    mask.style.strokeDashoffset = String(length * (1 - along));
+                    if (state === "drawing") {
+                        const point = shape.getPointAtLength(along * length);
+                        head.setAttribute("cx", String(point.x * k + x));
+                        head.setAttribute("cy", String(point.y * k + y));
+                    }
                 }
             });
         };
