@@ -88,8 +88,7 @@ export type JourneyRouteId =
     | "malaya-penang"
     | "penang-belawan"
     | "belawan-medan"
-    | "medan-sumatra"
-    | "sumatra-batavia"
+    | "belawan-batavia"
     | "batavia-buleleng"
     | "bali-surabaya"
     | "surabaya-surakarta"
@@ -107,8 +106,7 @@ export type JourneyRoute = {
     kind: "sea" | "land";
     /**
      * The places the leg joins. Its ends are drawn onto their dots exactly, since the
-     * designer's lines stop a little short of some. A leg that meets the next one
-     * between places (down Sumatra and across to Java) has no place at that end.
+     * designer's lines stop a little short of some.
      */
     from?: JourneyPlaceId;
     to?: JourneyPlaceId;
@@ -161,15 +159,14 @@ export const journeyRoutes: Record<JourneyRouteId, JourneyRoute> = {
         to: "medan",
         d: "M1450.31,977.23c0,0,1.08,8.78,0,11.15",
     },
-    "medan-sumatra": {
-        kind: "land",
-        from: "medan",
-        d: "M1451.01,988.39c2.59,1.12,5.61,0.7,8.3,1.65,2.52,0.89,4.79,2.37,6.85,4.06,3.96,3.24,9.4,7.95,10.36,13.17,0.96,5.22,1.32,10.05,4.3,14.88,2.65,4.28,6.4,7.88,10.8,10.33,4.71,2.62,9.44,3.12,14.68,3.61,5.24,0.49,9.45,2.4,10.22,8,0.64,4.62,-1.05,9.54,0.59,14.03,1.84,5.05,7.17,5.87,11.45,7.99,9.17,4.56,8.88,18.03,18.33,21.81,-2.96,4.66,2.29,9.64,6.03,11.7,5.98,2.32,9.98,7.32,13.98,11.32,1,1,2,0,3,1,2,2,3,4,4,6,5,12,10,25,22,31,6,-1,9,6,11,11,4,7,9,14,7,22,-3,12,-0.46,27.45,10.43,35.92",
-    },
-    "sumatra-batavia": {
+    // Back to Belawan's harbour and by sea to Java, down the Strait of Malacca and
+    // past Singapore's islands, as in the designer's third map ("The Journey with
+    // Details 3.jpg", traced from the raster since it came without an SVG).
+    "belawan-batavia": {
         kind: "sea",
+        from: "belawan",
         to: "batavia",
-        d: "M1624.33,1217.86c7.26,10.59,24.88,2.84,28.44,9.87",
+        d: "M1450.31,976.65c2.41,-1.05,4.69,-2.45,7.22,-3.14,1.88,-0.51,3.89,-0.56,5.84,-0.41,1.96,0.16,3.91,0.64,5.75,1.35,2.47,0.96,4.94,2.05,7.06,3.64,14.41,10.77,27.96,22.66,42.43,33.35,17.15,12.68,35.2,24.11,52.4,36.73,3.74,2.75,7.23,5.87,10.32,9.33,1.76,1.97,3.06,4.36,4.08,6.79,3.09,7.35,4.35,15.48,8.2,22.46,3.84,6.95,10.51,12.02,14.58,18.83,4.08,6.85,6.02,14.78,9.69,21.86,0.87,1.68,2.18,3.26,3.81,4.23,3.34,1.99,7.37,2.58,10.79,4.44,1.7,0.92,3.34,2.18,4.4,3.8,5.06,7.8,9.78,15.86,13.8,24.25,1.72,3.59,2.62,7.56,3.33,11.48,0.95,5.24,1.44,10.57,1.65,15.89,0.21,5.32,0.05,10.67,-0.38,15.98,-0.54,6.77,-1.67,13.47,-2.5,20.21",
     },
     "batavia-buleleng": {
         kind: "sea",
@@ -368,7 +365,7 @@ export const journeyStops: JourneyStop[] = [
         size: "small",
         image: image("batavia-arrival.jpg", "A colonial building with twin towers and an arched porch", 166, FULL_FRAME),
         marker: "batavia",
-        routes: ["medan-sumatra", "sumatra-batavia"],
+        routes: ["belawan-batavia"],
         cluster: "batavia",
         zoom: 3.2,
     },

@@ -69,10 +69,10 @@ const moreTextVariants: Variants = {
 };
 
 /**
- * On phones the photograph is drawn smaller, 150px tall rather than 180, over the
- * card's top 18px and out to the edge of the screen (the card stands 16px in).
+ * On phones the photograph is drawn smaller, 127px tall rather than 180, over the
+ * card's top 18px and 16px in from the edge of the screen (the card runs edge to edge).
  */
-const PHONE_PHOTO = { height: 150, overlap: 18, right: -16 };
+const PHONE_PHOTO = { height: 127, overlap: 18, right: 16 };
 
 const photoBox = (image: JourneyImage, cardWidth: number, phone: boolean): CSSProperties =>
     phone
@@ -102,6 +102,21 @@ const CardImage = ({ image, box }: { image: JourneyImage; box: CSSProperties }) 
     </motion.div>
 );
 
+type MoreToggleProps = { open: boolean; onToggle: () => void; controls: string };
+
+const MoreToggle = ({ open, onToggle, controls }: MoreToggleProps) => (
+    <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={controls}
+        className="flex h-[25px] w-fit items-center gap-[2px] rounded-sm text-[15px] lowercase leading-[24.8px] text-s2s-gold transition-opacity hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-s2s-gold"
+    >
+        {open ? "read less" : "read more"}
+        {open ? <MinusIcon className="h-[21px] w-[21px]" /> : <PlusIcon className="h-[21px] w-[21px]" />}
+    </button>
+);
+
 type JourneyCardProps = {
     stop: JourneyStop;
     open: boolean;
@@ -116,7 +131,8 @@ type JourneyCardProps = {
  * One stop: date, place and summary, with its photograph overhanging the top
  * right corner. "Read more" opens a second card underneath on the same left edge,
  * rather than stretching this one, since some of the longer notes would otherwise
- * run off the screen.
+ * run off the screen. On phones it opens over the card instead, from the same
+ * foot, with its own "read less".
  *
  * The card animates through the "hidden" and "shown" variants of whatever
  * motion element it is placed in; see `cardVariants`.
@@ -130,30 +146,21 @@ const JourneyCard = ({ stop, open, onToggle, moreWidth, fixedWidth }: JourneyCar
             <motion.article
                 variants={panelVariants}
                 style={{ originX: 0 }}
-                className={`bg-white/95 py-[30px] pl-[30px] pr-[60px] max-lg:p-[18px] ${shadow}`}
+                className={`bg-white/95 py-[30px] pl-[30px] pr-[60px] max-lg:p-[18px] ${shadow} max-lg:shadow-none`}
             >
                 <motion.div variants={textVariants} className="flex flex-col gap-[5px] max-lg:gap-[2px]">
-                    <h2 className="font-Bodoni text-[21px] font-normal italic leading-[36px] text-s2s-wine">{stop.date}</h2>
+                    <h2 className="font-Bodoni text-[21px] font-normal italic leading-[36px] text-s2s-wine max-lg:text-[20px]">
+                        {stop.date}
+                    </h2>
                     <p className="text-[15px] uppercase leading-[18px] tracking-[1.8px] text-s2s-gray opacity-70 max-lg:text-[14px] max-lg:leading-normal max-lg:tracking-[1.68px]">
                         {stop.place}
                     </p>
                     <p className="text-[16px] leading-[26px] text-s2s-ink max-lg:leading-[24px]">{stop.summary}</p>
-                    {stop.more && (
-                        <button
-                            type="button"
-                            onClick={onToggle}
-                            aria-expanded={open}
-                            aria-controls={moreId}
-                            className="flex h-[25px] w-fit items-center gap-[2px] rounded-sm text-[15px] lowercase leading-[24.8px] text-s2s-gold transition-opacity hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-s2s-gold"
-                        >
-                            {open ? "read less" : "read more"}
-                            {open ? <MinusIcon className="h-[21px] w-[21px]" /> : <PlusIcon className="h-[21px] w-[21px]" />}
-                        </button>
-                    )}
+                    {stop.more && <MoreToggle open={open} onToggle={onToggle} controls={moreId} />}
                 </motion.div>
             </motion.article>
 
-            {/* On phones the open read-more card lifts this one up to the dates, so the photograph steps aside. */}
+            {/* On phones the read-more panel takes the card's place, so the photograph steps aside. */}
             {stop.image && (
                 <div className={`transition-opacity duration-300 ${open && !fixedWidth ? "pointer-events-none opacity-0" : ""}`}>
                     <CardImage image={stop.image} box={photoBox(stop.image, width, !fixedWidth)} />
@@ -161,20 +168,38 @@ const JourneyCard = ({ stop, open, onToggle, moreWidth, fixedWidth }: JourneyCar
             )}
 
             <AnimatePresence initial={false}>
-                {open && stop.more && (
-                    <motion.div
-                        key="more"
-                        id={moreId}
-                        variants={morePanelVariants}
-                        initial="hidden"
-                        animate="shown"
-                        exit="hidden"
-                        className={`bg-white/95 p-[30px] text-[16px] leading-[28px] text-s2s-ink max-lg:max-h-[30svh] max-lg:overflow-y-auto max-lg:p-5 ${shadow}`}
-                        style={{ originX: 0, marginTop: MORE_GAP, width: fixedWidth ? moreWidth : undefined }}
-                    >
-                        <motion.p variants={moreTextVariants}>{stop.more}</motion.p>
-                    </motion.div>
-                )}
+                {open &&
+                    stop.more &&
+                    (fixedWidth ? (
+                        <motion.div
+                            key="more"
+                            id={moreId}
+                            variants={morePanelVariants}
+                            initial="hidden"
+                            animate="shown"
+                            exit="hidden"
+                            className={`bg-white/95 p-[30px] text-[16px] leading-[28px] text-s2s-ink ${shadow}`}
+                            style={{ originX: 0, marginTop: MORE_GAP, width: moreWidth }}
+                        >
+                            <motion.p variants={moreTextVariants}>{stop.more}</motion.p>
+                        </motion.div>
+                    ) : (
+                        // Rises from the card's foot as far as the note needs, stopping 16px
+                        // short of the dates (the page's header, the dates' 153px and the
+                        // 65px call to action below make up the 291px).
+                        <motion.div
+                            key="more"
+                            id={moreId}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.25 }}
+                            className="absolute inset-x-0 bottom-0 flex max-h-[calc(100svh-291px)] flex-col items-start gap-[10px] overflow-y-auto bg-white p-[18px] text-[16px] leading-[24px] text-s2s-ink"
+                        >
+                            <p>{stop.more}</p>
+                            <MoreToggle open onToggle={onToggle} controls={moreId} />
+                        </motion.div>
+                    ))}
             </AnimatePresence>
         </div>
     );

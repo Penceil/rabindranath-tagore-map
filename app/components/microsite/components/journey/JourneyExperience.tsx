@@ -207,9 +207,9 @@ const routeStopIndex = (route: JourneyRouteId) => journeyStops.findIndex((stop) 
 /** Where on screen the stop's dot should sit so its card, photograph included, fits beside it. */
 const anchorFor = (index: number, viewport: Size, desktop: boolean): Point => {
     if (!desktop) {
-        // Between the strip of dates (its foot 182px down) and the top of the card,
-        // which stands about 335px clear of the bottom, above the call to action.
-        return { x: viewport.width / 2, y: Math.max(200, (182 + viewport.height - 335) / 2) };
+        // Between the pill of dates (its foot 153px down) and the top of the card,
+        // which stands about 257px clear of the bottom, on the call to action.
+        return { x: viewport.width / 2, y: Math.max(190, (153 + viewport.height - 257) / 2) };
     }
     const stop = journeyStops[index];
     // The card hangs from the date's own dot, which can sit a little east of the place.
@@ -812,12 +812,15 @@ const JourneyExperience = () => {
                     <p className="text-[13px] uppercase leading-[24px] tracking-[1.56px] text-white lg:text-[16px] lg:leading-[24px] lg:tracking-[1.92px]">
                         Rabindranath Tagore&apos;s 1927 Journey to
                     </p>
-                    <h1 className="font-Bodoni text-[36px] font-normal leading-[42px] tracking-[-1.08px] text-white lg:-mt-[6px] lg:text-[45px] lg:leading-[58px] lg:tracking-[-1.35px]">
-                        <span className="italic">Java and</span> Bali
-                    </h1>
-                    <p className="text-[13px] uppercase leading-[24px] tracking-[1.56px] text-white lg:text-[16px] lg:leading-[19px] lg:tracking-[1.92px]">
-                        And the Way Home
-                    </p>
+                    {/* On phones "And the Way Home" follows the name on its line. */}
+                    <div className="-mt-[4px] flex items-baseline gap-x-[10px] lg:mt-0 lg:block">
+                        <h1 className="font-Bodoni text-[30px] font-normal leading-[42px] tracking-[-0.9px] text-white lg:-mt-[6px] lg:text-[45px] lg:leading-[58px] lg:tracking-[-1.35px]">
+                            <span className="italic">Java and</span> Bali
+                        </h1>
+                        <p className="text-[13px] uppercase leading-[24px] tracking-[1.56px] text-white lg:text-[16px] lg:leading-[19px] lg:tracking-[1.92px]">
+                            And the Way Home
+                        </p>
+                    </div>
                 </header>
 
                 {viewport &&
@@ -827,9 +830,10 @@ const JourneyExperience = () => {
                         <JourneyTimelineMobile stops={stops} active={active} onSelect={goTo} />
                     ))}
 
-                {/* The way on to the exhibition, along the foot of the map over a band of gold fading up into it. */}
+                {/* The way on to the exhibition, along the foot of the map over a band of gold fading
+                    up into it: two lines on desktop, one on phones under the card. */}
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[145px] bg-gradient-to-t from-[rgba(205,140,63,0.6)] from-[42.788%] to-[rgba(205,140,63,0)] to-[93.269%]">
-                    <div className="pointer-events-auto absolute left-[34px] top-[48px] flex flex-col items-start gap-[10px] lg:left-[60px] lg:gap-[11px]">
+                    <div className="pointer-events-auto absolute left-4 top-[92px] flex items-baseline gap-x-[6px] lg:left-[60px] lg:top-[48px] lg:flex-col lg:items-start lg:gap-[11px]">
                         <p className="text-[16px] font-medium leading-[28px] text-s2s-wine">Unfold more of the journey</p>
                         <UnderlineLink
                             href={exhibitionHref || "#"}
@@ -868,7 +872,7 @@ const JourneyExperience = () => {
                 )}
 
                 {viewport && !desktop && (
-                    <div className="absolute inset-x-4 bottom-[119px]" aria-live="polite">
+                    <div className="absolute inset-x-0 bottom-[65px]" aria-live="polite">
                         <AnimatePresence mode="wait">
                             {showCard && (
                                 <motion.div
