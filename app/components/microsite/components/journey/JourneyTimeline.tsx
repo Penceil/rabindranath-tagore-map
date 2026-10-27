@@ -127,19 +127,23 @@ export const JourneyTimelineDesktop = ({ stops, active, onSelect }: JourneyTimel
     );
 };
 
-/** The phone's date rolls up out of the pill going forward, and back down going back. */
+/**
+ * The phone's date slides the way its arrows point: going forward the next date
+ * comes in from the right and the last leaves to the left, and back the other way.
+ */
 const pillVariants: Variants = {
-    enter: (direction: number) => ({ y: 24 * direction, opacity: 0 }),
-    shown: { y: 0, opacity: 1 },
-    leave: (direction: number) => ({ y: -24 * direction, opacity: 0 }),
+    enter: (direction: number) => ({ x: 48 * direction, opacity: 0 }),
+    shown: { x: 0, opacity: 1 },
+    leave: (direction: number) => ({ x: -48 * direction, opacity: 0 }),
 };
 
 /**
  * Phones show one date at a time, as in the design: a pill along the left edge
  * under the title, the current date in white capitals between an arrow back and
- * an arrow on, each left out at its end of the journey. On the last date the pill
- * offers the button back to the first in its place. Dates too long for two lines
- * (the Jogjakarta stays) make the pill a little taller rather than shrink.
+ * an arrow on, each left out at its end of the journey, and dates sliding across
+ * as they change. On the last date the pill offers the button back to the first
+ * in its place. Dates too long for two lines (the Jogjakarta stays) make the pill
+ * a little taller rather than shrink.
  */
 export const JourneyTimelineMobile = ({ stops, active, onSelect }: JourneyTimelineProps) => {
     const reduceMotion = useReducedMotion();
@@ -167,7 +171,8 @@ export const JourneyTimelineMobile = ({ stops, active, onSelect }: JourneyTimeli
                 </button>
             )}
 
-            <div className="ml-[30px] grid w-[158px] place-items-center py-[4px]">
+            {/* Clipped, so a date sliding in or out never passes over the arrows. */}
+            <div className="ml-[30px] grid w-[158px] place-items-center overflow-hidden py-[4px]">
                 <AnimatePresence initial={false} custom={step.direction}>
                     <motion.div
                         key={last ? "restart" : stops[active].id}
