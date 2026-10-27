@@ -2,7 +2,7 @@
 
 import { Fragment, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { JOURNEY_ASSETS, type JourneyStop } from "../../data/journey";
 
 type JourneyTimelineProps = {
@@ -127,90 +127,103 @@ export const JourneyTimelineDesktop = ({ stops, active, onSelect }: JourneyTimel
     );
 };
 
+/** The pill's height, and the width each date has in it. */
+const PILL_HEIGHT = 49;
+const PILL_SLOT = 158;
+
 /**
- * The phone's date slides the way its arrows point: going forward the next date
- * comes in from the right and the last leaves to the left, and back the other way.
+ * One ease for the strip, the pill's height and the arrows, so they move as one.
+ * Under `motion-safe` like the transitions themselves, which would otherwise bring
+ * Tailwind's 150ms default back with them.
  */
-const pillVariants: Variants = {
-    enter: (direction: number) => ({ x: 48 * direction, opacity: 0 }),
-    shown: { x: 0, opacity: 1 },
-    leave: (direction: number) => ({ x: -48 * direction, opacity: 0 }),
-};
+const pillMotion = "motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.65,0,0.35,1)]";
+
+const pillArrow = (hidden: boolean) =>
+    `${arrowButton} absolute top-1/2 -translate-y-1/2 transition-opacity ${pillMotion} ${hidden ? "pointer-events-none opacity-0" : ""}`;
 
 /**
  * Phones show one date at a time, as in the design: a pill along the left edge
  * under the title, the current date in white capitals between an arrow back and
- * an arrow on, each left out at its end of the journey, and dates sliding across
- * as they change. On the last date the pill offers the button back to the first
- * in its place. Dates too long for two lines (the Jogjakarta stays) make the pill
- * a little taller rather than shrink.
+ * an arrow on, each fading out at its end of the journey. On the last date the
+ * pill offers the button back to the first in its place.
+ *
+ * The dates sit side by side on a strip that slides the way the arrows point. It
+ * moves by a CSS transition, which the browser runs off the main thread, so it
+ * stays smooth while the map flies to the date at the same moment; a quick run of
+ * dates while scrolling simply carries the strip on. Dates too long for two lines
+ * (the Jogjakarta stays) ease the pill a little taller rather than shrink.
  */
 export const JourneyTimelineMobile = ({ stops, active, onSelect }: JourneyTimelineProps) => {
-    const reduceMotion = useReducedMotion();
-    // Which way the dates roll, kept in step with `active` as it changes.
-    const [step, setStep] = useState({ at: active, direction: 1 });
-    if (step.at !== active) {
-        setStep({ at: active, direction: active > step.at ? 1 : -1 });
-    }
+    const cellRefs = useRef<(HTMLLIElement | null)[]>([]);
+    const [height, setHeight] = useState(PILL_HEIGHT);
     const first = active === 0;
     const last = active === stops.length - 1;
+
+    useLayoutEffect(() => {
+        const content = cellRefs.current[active]?.firstElementChild as HTMLElement | null | undefined;
+        setHeight(Math.max(PILL_HEIGHT, (content?.offsetHeight ?? 0) + 8));
+    }, [active]);
 
     return (
         <nav
             aria-label="Dates of the journey"
-            className="absolute left-0 top-[104px] z-10 flex min-h-[49px] w-[218px] items-center overflow-hidden rounded-r-[5px] bg-[rgba(205,140,63,0.5)]"
+            className={`absolute left-0 top-[104px] z-10 w-[218px] overflow-hidden rounded-r-[5px] bg-[rgba(205,140,63,0.5)] motion-safe:transition-[height] ${pillMotion}`}
+            style={{ height }}
         >
-            {!first && (
-                <button
-                    type="button"
-                    onClick={() => onSelect(active - 1)}
-                    aria-label="Previous date"
-                    className={`${arrowButton} absolute left-[5px] top-1/2 -translate-y-1/2`}
-                >
-                    <Chevron className="h-[5px] w-[10px] -rotate-90" />
-                </button>
-            )}
+            <button
+                type="button"
+                onClick={() => onSelect(active - 1)}
+                aria-label="Previous date"
+                aria-hidden={first || undefined}
+                tabIndex={first ? -1 : undefined}
+                className={`${pillArrow(first)} left-[5px]`}
+            >
+                <Chevron className="h-[5px] w-[10px] -rotate-90" />
+            </button>
 
-            {/* Clipped, so a date sliding in or out never passes over the arrows. */}
-            <div className="ml-[30px] grid w-[158px] place-items-center overflow-hidden py-[4px]">
-                <AnimatePresence initial={false} custom={step.direction}>
-                    <motion.div
-                        key={last ? "restart" : stops[active].id}
-                        custom={step.direction}
-                        variants={pillVariants}
-                        initial="enter"
-                        animate="shown"
-                        exit="leave"
-                        transition={reduceMotion ? { duration: 0 } : { duration: 0.35, ease: [0.42, 0, 0.58, 1] }}
-                        className="[grid-area:1/1]"
-                    >
-                        {last ? (
-                            <button
-                                type="button"
-                                onClick={() => onSelect(0)}
-                                className={`${restartButton} h-[34px] w-[137px] whitespace-nowrap px-[10px] leading-none`}
-                            >
-                                restart the journey
-                            </button>
-                        ) : (
-                            <p className="w-[158px] text-center text-[14px] font-bold uppercase leading-[20px] tracking-[1.68px] text-white [text-wrap:balance]">
-                                {stops[active].date}
-                            </p>
-                        )}
-                    </motion.div>
-                </AnimatePresence>
+            {/* Clipped, so the dates either side never show past the arrows. */}
+            <div className="absolute inset-y-0 left-[30px] overflow-hidden" style={{ width: PILL_SLOT }}>
+                <ol
+                    className={`flex h-full motion-safe:transition-transform ${pillMotion}`}
+                    style={{ transform: `translateX(${-active * PILL_SLOT}px)` }}
+                >
+                    {stops.map((stop, index) => (
+                        <li
+                            key={stop.id}
+                            ref={(element) => (cellRefs.current[index] = element)}
+                            aria-hidden={index !== active || undefined}
+                            className="flex shrink-0 items-center justify-center"
+                            style={{ width: PILL_SLOT }}
+                        >
+                            {index === stops.length - 1 ? (
+                                <button
+                                    type="button"
+                                    onClick={() => onSelect(0)}
+                                    tabIndex={last ? undefined : -1}
+                                    className={`${restartButton} h-[34px] w-[137px] whitespace-nowrap px-[10px] leading-none`}
+                                >
+                                    restart the journey
+                                </button>
+                            ) : (
+                                <p className="w-full text-center text-[14px] font-bold uppercase leading-[20px] tracking-[1.68px] text-white [text-wrap:balance]">
+                                    {stop.date}
+                                </p>
+                            )}
+                        </li>
+                    ))}
+                </ol>
             </div>
 
-            {!last && (
-                <button
-                    type="button"
-                    onClick={() => onSelect(active + 1)}
-                    aria-label="Next date"
-                    className={`${arrowButton} absolute right-[4px] top-1/2 -translate-y-1/2`}
-                >
-                    <Chevron className="h-[5px] w-[10px] rotate-90" />
-                </button>
-            )}
+            <button
+                type="button"
+                onClick={() => onSelect(active + 1)}
+                aria-label="Next date"
+                aria-hidden={last || undefined}
+                tabIndex={last ? -1 : undefined}
+                className={`${pillArrow(last)} right-[4px]`}
+            >
+                <Chevron className="h-[5px] w-[10px] rotate-90" />
+            </button>
         </nav>
     );
 };
