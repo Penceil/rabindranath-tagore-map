@@ -499,13 +499,12 @@ const JourneyExperience = () => {
         const target: View = { focus: focusOf(active), zoom: stop.zoom };
         const targetAnchor = anchorFor(active, viewportRef.current, viewportRef.current.width >= DESKTOP_MIN);
 
-        // Going back over dates that retrace, the lines drawn since this one (all of
-        // them, or as far as their head had got) are traced back as the map returns.
+        // Going back, the lines drawn since this date (all of them, or as far as their
+        // head had got) are traced back as the map returns along them.
         const drawnAhead = stops
             .flatMap((candidate, index) => (index > active ? candidate.routes ?? [] : []))
             .filter((id) => progress[id].get() > 0);
-        const retrace =
-            !instant && !forward && drawnAhead.length > 0 && drawnAhead.every((id) => stops[routeStopIndex(id)].retrace);
+        const retrace = !instant && !forward && drawnAhead.length > 0;
 
         // Crossings already sailed stay drawn; those ahead are taken back off the map.
         routeIds.forEach((id) => {

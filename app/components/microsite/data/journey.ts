@@ -264,13 +264,11 @@ export type JourneyStop = {
     cluster?: JourneyPlaceId;
     /** Other places lit with this stop. */
     also?: JourneyPlaceId[];
-    /** The legs that bring the journey here, drawn one after another as the map follows them. */
-    routes?: JourneyRouteId[];
     /**
-     * Going back from this date traces its legs back: the line undraws behind the
-     * map as it glides back along it, rather than being taken off at once.
+     * The legs that bring the journey here, drawn one after another as the map
+     * follows them, and traced back the same way when going back past this date.
      */
-    retrace?: boolean;
+    routes?: JourneyRouteId[];
     /** An inland tour: its places appear one after another, without a line. */
     series?: JourneyPlaceId[];
     /** How far the map zooms in, against the overview of the first stop. */
@@ -318,14 +316,12 @@ export const journeyStops: JourneyStop[] = [
         }),
         marker: "singapore",
         routes: ["calcutta-madras", "madras-singapore"],
-        // Only the first two crossings trace back for now, until the client confirms the rest.
-        retrace: true,
         also: ["madras"],
         zoom: 1.35,
     },
     {
         id: "singapore-malaya",
-        date: "c. Late July - August",
+        date: "Late July - August",
         place: "Singapore & Malaya",
         summary: "Month-long stay in Singapore and Malaya before crossing to the Dutch East Indies.",
         more: "Dutch musicologist Arnold Bake (who had studied at Santiniketan) acted as mediator and had warned Tagore the Dutch were nervous about recent communist uprisings. Tagore's promise to keep out of politics reassured the authorities. The invitation came privately from the Kunstkring (Art Circle), not the colonial government.",
@@ -338,7 +334,6 @@ export const journeyStops: JourneyStop[] = [
         }),
         marker: "malaya",
         routes: ["singapore-malaya"],
-        retrace: true,
         also: ["singapore"],
         zoom: 1.8,
     },
@@ -508,7 +503,7 @@ export const journeyStops: JourneyStop[] = [
     },
     {
         id: "contact-club",
-        date: "c. 17 September",
+        date: "17 September",
         place: "SURAKARTA",
         summary: "Reception with Javanese poets at the Contact Club before departure.",
         more: "Poems from his Katha o Kahini (Stories and Fables) were recited in Dutch and Javanese; a Javanese poet's reply to his Java poem was read out and sung. The Surakarta experience was a high point of the Java visit.",
