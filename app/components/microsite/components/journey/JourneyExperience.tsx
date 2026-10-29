@@ -649,9 +649,40 @@ const JourneyExperience = () => {
     }, [active, viewport === null]);
 
     // A resize reframes the current date at once rather than replaying its flight.
+    // A phone's toolbars showing or hiding only changes the height, though: then the
+    // map eases to its new place instead of jumping, or, mid-flight, simply flies on.
+    // The size the map was last framed for.
+    const sized = useRef<Size | null>(null);
+    const reframing = useRef<AnimationPlaybackControls | null>(null);
     useEffect(() => {
         if (!viewport) {
             return;
+        }
+        const before = sized.current;
+        sized.current = viewport;
+        reframing.current?.stop();
+        if (before && before.width === viewport.width) {
+            if (moving) {
+                return;
+            }
+            if (!reduceMotion) {
+                const from = anchorRef.current;
+                const to = anchorFor(active, viewport, desktop);
+                reframing.current = animate(0, 1, {
+                    duration: 0.4,
+                    ease: EASE_FLIGHT,
+                    onUpdate: (t) => {
+                        // A phone's zoom follows the height, so the size framed for eases too.
+                        const size = { width: viewport.width, height: before.height + (viewport.height - before.height) * t };
+                        sized.current = size;
+                        viewportRef.current = size;
+                        base.set(baseScale(size));
+                        anchorRef.current = lerpPoint(from, to, t);
+                        applyView(viewRef.current);
+                    },
+                });
+                return;
+            }
         }
         anchorRef.current = anchorFor(active, viewport, desktop);
         applyView(viewRef.current);
@@ -725,9 +756,11 @@ const JourneyExperience = () => {
             className="relative [--journey-header:57px] lg:[--journey-header:64px]"
             style={{ height: `calc(100svh - var(--journey-header) + ${stops.length - 1} * 70svh)` }}
         >
+            {/* As tall as the screen shows right now (dvh), so the map still fills it
+                when a phone browser tucks its toolbars away while scrolling. */}
             <div
                 ref={stageRef}
-                className="sticky top-[var(--journey-header)] h-[calc(100svh-var(--journey-header))] min-h-[520px] w-full overflow-hidden bg-[#ddb55c]"
+                className="sticky top-[var(--journey-header)] h-[calc(100dvh-var(--journey-header))] min-h-[520px] w-full overflow-hidden bg-[#ddb55c]"
             >
                 {/* The map itself, scaled and moved as one layer. */}
                 <motion.div

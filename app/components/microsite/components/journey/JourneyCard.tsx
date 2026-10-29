@@ -194,7 +194,7 @@ const JourneyCard = ({ stop, open, onToggle, moreWidth, fixedWidth }: JourneyCar
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.25 }}
-                            className="absolute inset-x-0 bottom-0 flex max-h-[calc(100svh-291px)] flex-col items-start gap-[10px] overflow-y-auto bg-white p-[18px] text-[16px] leading-[24px] text-s2s-ink"
+                            className="absolute inset-x-0 bottom-0 flex max-h-[calc(100dvh-291px)] flex-col items-start gap-[10px] overflow-y-auto bg-white p-[18px] text-[16px] leading-[24px] text-s2s-ink"
                         >
                             <p>{stop.more}</p>
                             <MoreToggle open onToggle={onToggle} controls={moreId} />
